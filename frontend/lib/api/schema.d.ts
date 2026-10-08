@@ -253,7 +253,7 @@ export interface components {
              * Evaluate Target Health
              * @default false
              */
-            evaluate_target_health: boolean;
+            evaluate_target_health?: boolean;
         };
         /** Change */
         Change: {
@@ -271,7 +271,7 @@ export interface components {
              * Comment
              * @default
              */
-            comment: string;
+            comment?: string;
             /** Changes */
             changes: components["schemas"]["Change"][];
         };
@@ -282,7 +282,7 @@ export interface components {
              * @description Changes apply immediately in the clone
              * @default INSYNC
              */
-            status: string;
+            status?: string;
             /** Comment */
             comment: string;
             /**
@@ -335,7 +335,7 @@ export interface components {
              * Details
              * @default []
              */
-            details: components["schemas"]["ErrorDetail"][];
+            details?: components["schemas"]["ErrorDetail"][];
         };
         /**
          * FailoverRole
@@ -374,19 +374,19 @@ export interface components {
              * Description
              * @default
              */
-            description: string;
+            description?: string;
             /** @default public */
-            type: components["schemas"]["ZoneType"];
+            type?: components["schemas"]["ZoneType"];
             /**
              * Vpcs
              * @default []
              */
-            vpcs: components["schemas"]["VpcAssociation"][];
+            vpcs?: components["schemas"]["VpcAssociation"][];
             /**
              * Tags
              * @default []
              */
-            tags: components["schemas"]["Tag"][];
+            tags?: components["schemas"]["Tag"][];
         };
         /** HostedZoneDetail */
         HostedZoneDetail: {
@@ -469,22 +469,22 @@ export interface components {
              * Create
              * @default 0
              */
-            create: number;
+            create?: number;
             /**
              * Replace
              * @default 0
              */
-            replace: number;
+            replace?: number;
             /**
              * Skip
              * @default 0
              */
-            skip: number;
+            skip?: number;
             /**
              * Error
              * @default 0
              */
-            error: number;
+            error?: number;
         };
         /** ImportedRecordSet */
         ImportedRecordSet: {
@@ -557,7 +557,7 @@ export interface components {
              * @description Relative to the zone (`www`), fully qualified, or empty / `@` for the apex
              * @default
              */
-            name: string;
+            name?: string;
             type: components["schemas"]["RecordType"];
             /**
              * Ttl
@@ -569,9 +569,9 @@ export interface components {
              * @description One entry per value; empty for alias
              * @default []
              */
-            values: string[];
+            values?: string[];
             /** @default simple */
-            routing_policy: components["schemas"]["RoutingPolicy"];
+            routing_policy?: components["schemas"]["RoutingPolicy"];
             /** Set Identifier */
             set_identifier?: string | null;
             /** Weight */
@@ -678,7 +678,7 @@ export interface components {
              * Value
              * @default
              */
-            value: string;
+            value?: string;
         };
         /** TagList */
         TagList: {
@@ -736,13 +736,13 @@ export interface components {
              * @description Validate and preview without saving
              * @default true
              */
-            dry_run: boolean;
+            dry_run?: boolean;
             /**
              * Replace Existing
              * @description Overwrite record sets that already exist in the zone
              * @default false
              */
-            replace_existing: boolean;
+            replace_existing?: boolean;
         };
         /** ZoneFileImportResult */
         ZoneFileImportResult: {

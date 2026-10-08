@@ -22,11 +22,3 @@ export type ChangeBatchResult = Schemas["ChangeBatchResult"];
 
 export type ZoneFileImportResult = Schemas["ZoneFileImportResult"];
 export type ImportedRecordSet = Schemas["ImportedRecordSet"];
-
-export interface Page<Item> {
-  items: Item[];
-  total: number;
-  page: number;
-  page_size: number;
-  pages: number;
-}
