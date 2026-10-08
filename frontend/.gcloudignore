@@ -1,0 +1,9 @@
+# Files Cloud Build does not need; mirrors .dockerignore.
+node_modules/
+.next/
+.env
+.env.*
+!.env.example
+e2e/
+test-results/
+playwright-report/
