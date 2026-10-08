@@ -252,7 +252,26 @@ triggers; the table scrolls horizontally with the sticky scrollbar (S52, S53).
 | Test record, Configure query logging, DNSSEC, Accelerated recovery, the wizard, alias endpoints for AWS resources: present but inert or "coming soon". | Outside the assignment scope. |
 | The search-mode preference is shown but has no effect. | The API always searches every field. |
 
-## 14. Open questions
+## 14. Verification against the references
+
+Screenshots of the clone were taken in the same states as the references (same data,
+1920x1080, light, dark and 800 px) and compared side by side. The same DevTools snapshot
+script that produced the `D##` files was also run inside the clone and diffed:
+
+| Check | Result |
+|---|---|
+| Design tokens (D01, D04, D12 `cssVariables`) | All 599 Cloudscape tokens the two share by name have the same value in light and in dark mode, once colour notation is normalised (`#fff` vs `#ffffff`). The console defines extra tokens for components the clone does not use. |
+| Frame geometry (`stickyAndFixed`) | Identical: header 1920x48 at 0, toolbar 1920x42 at 48, navigation 280x955 at 90, side split panel 400x955 at x 1520, sticky table header at top 90 (zone page) and 102 (zones list), sticky table scrollbar, footer 1920x35 at 1045. The table header block is 1 px taller in the clone because of the font. |
+| Scroll model (`windowScroll`, `scrollContainers`) | Same: the window scrolls, no inner scroll containers. |
+| Motion (`motion`) | Every Cloudscape transition and animation present on the page is identical in property, duration and easing. The console's extra entries belong to its global navigation widgets (search, assistant) and to its always-mounted modal. |
+| Copy | Headings, labels, placeholders, constraint and error text, empty states and notifications match the captured `visibleText`, except where section 13 says otherwise. |
+| Flows (V05–V09) | Create zone, create/edit/delete records, blocked and successful zone delete, filtering and sorting behave as recorded; covered by the end-to-end test. |
+
+Remaining visible differences are the deliberate ones in section 13, plus: glyph widths
+(Open Sans is slightly wider than Amazon Ember), no sort control on the Differentiator and
+Value columns (the API does not sort by them), and the navigation staying open at 800 px.
+
+## 15. Open questions
 
 - The password step of the real sign-in (S02) and the visual-mode transition (V14) were not
   captured; both follow stock Cloudscape.
