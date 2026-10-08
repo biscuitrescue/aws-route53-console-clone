@@ -42,11 +42,14 @@ export const routingPolicyLabel: Record<RoutingPolicy, string> = {
   multivalue: "Multivalue answer",
 };
 
+const RECORD_ERROR_PREFIX = "Invalid Resource Record: 'FATAL problem: ";
+
 /**
- * Route 53 wraps rejections as `Invalid Resource Record: 'FATAL problem: <detail>'`.
- * The console shows only the detail.
+ * Route 53 wraps record rejections as `Invalid Resource Record: 'FATAL problem: <detail>'`.
+ * The console shows the detail, including the wrapper's closing quote.
  */
 export function errorDetail(message: string): string {
-  const match = /FATAL problem: (.*)'$/.exec(message);
-  return match ? match[1] : message;
+  return message.startsWith(RECORD_ERROR_PREFIX)
+    ? message.slice(RECORD_ERROR_PREFIX.length)
+    : message;
 }

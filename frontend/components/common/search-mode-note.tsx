@@ -9,6 +9,8 @@ export function SearchModeNote({ onOpenSettings }: { onOpenSettings: () => void 
       Automatic mode is the current search behavior optimized for best filter results.{" "}
       <Link
         variant="primary"
+        fontSize="inherit"
+        href="#"
         onFollow={(event) => {
           event.preventDefault();
           onOpenSettings();

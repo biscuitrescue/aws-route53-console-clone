@@ -28,7 +28,7 @@ import { RecordFields } from "./record-fields";
 function Detail({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div>
-      <Box variant="awsui-key-label">{label}</Box>
+      <Box margin={{ bottom: "xxs" }}>{label}</Box>
       <div>{children}</div>
     </div>
   );
@@ -48,46 +48,41 @@ function Copyable({ text }: { text: string }) {
 
 /** Read-only details of one record. */
 export function RecordDetails({ record, onEdit }: { record: RecordSet; onEdit: () => void }) {
-  const distinguishing = differentiator(record);
+  const target = record.alias ? record.alias_target : null;
+  // A flat list, so the panel spaces every entry evenly.
+  const details: { label: string; value: ReactNode }[] = [
+    { label: "Record name", value: <Copyable text={displayName(record.name)} /> },
+    { label: "Record type", value: record.type },
+    target
+      ? { label: "Route traffic to", value: <Copyable text={target.dns_name} /> }
+      : {
+          label: "Value",
+          value: record.values.map((value) => (
+            <div key={value}>
+              <Copyable text={value} />
+            </div>
+          )),
+        },
+    { label: "Alias", value: target ? "Yes" : "No" },
+    target
+      ? { label: "Evaluate target health", value: target.evaluate_target_health ? "Yes" : "No" }
+      : { label: "TTL (seconds)", value: record.ttl === null ? "-" : formatNumber(record.ttl) },
+    { label: "Routing policy", value: routingPolicyLabel[record.routing_policy] },
+    ...(record.routing_policy === "simple"
+      ? []
+      : [
+          { label: "Differentiator", value: orDash(differentiator(record)) },
+          { label: "Record ID", value: orDash(record.set_identifier) },
+        ]),
+  ];
   return (
     <SpaceBetween size="l">
       <Button onClick={onEdit}>Edit record</Button>
-      <Detail label="Record name">
-        <Copyable text={displayName(record.name)} />
-      </Detail>
-      <Detail label="Record type">{record.type}</Detail>
-      {record.alias && record.alias_target ? (
-        <>
-          <Detail label="Route traffic to">
-            <Copyable text={record.alias_target.dns_name} />
-          </Detail>
-          <Detail label="Alias">Yes</Detail>
-          <Detail label="Evaluate target health">
-            {record.alias_target.evaluate_target_health ? "Yes" : "No"}
-          </Detail>
-        </>
-      ) : (
-        <>
-          <Detail label="Value">
-            {record.values.map((value) => (
-              <div key={value}>
-                <Copyable text={value} />
-              </div>
-            ))}
-          </Detail>
-          <Detail label="Alias">No</Detail>
-          <Detail label="TTL (seconds)">
-            {record.ttl === null ? "-" : formatNumber(record.ttl)}
-          </Detail>
-        </>
-      )}
-      <Detail label="Routing policy">{routingPolicyLabel[record.routing_policy]}</Detail>
-      {record.routing_policy !== "simple" && (
-        <>
-          <Detail label="Differentiator">{orDash(distinguishing)}</Detail>
-          <Detail label="Record ID">{orDash(record.set_identifier)}</Detail>
-        </>
-      )}
+      {details.map((detail) => (
+        <Detail key={detail.label} label={detail.label}>
+          {detail.value}
+        </Detail>
+      ))}
     </SpaceBetween>
   );
 }

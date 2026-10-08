@@ -158,7 +158,9 @@ test("placeholder sections show Coming soon inside the console frame", async ({ 
   ]) {
     await page.goto(path);
     await expect(page.getByRole("heading", { name: title, level: 1 })).toBeVisible();
-    await expect(page.getByText("Coming soon", { exact: true })).toBeVisible();
+    await expect(
+      page.getByRole("main").getByRole("heading", { name: "Coming soon" }),
+    ).toBeVisible();
     await expect(page.getByRole("navigation", { name: "Breadcrumbs" })).toContainText(title);
   }
 });

@@ -39,6 +39,9 @@ interface ConsolePageProps {
   contentType?: AppLayoutProps.ContentType;
   /** A Cloudscape `SplitPanel`, for pages that show details of the selected row. */
   splitPanel?: ReactNode;
+  /** Control the split panel from the page; by default it starts open and the user toggles it. */
+  splitPanelOpen?: boolean;
+  onSplitPanelToggle?: (open: boolean) => void;
   children: ReactNode;
 }
 
@@ -66,6 +69,8 @@ export function ConsolePage({
   navigationOpen: navigationOpenByDefault = true,
   contentType = "default",
   splitPanel,
+  splitPanelOpen: controlledSplitPanelOpen,
+  onSplitPanelToggle,
   children,
 }: ConsolePageProps) {
   const pathname = usePathname();
@@ -76,7 +81,8 @@ export function ConsolePage({
   const [navigationOpen, setNavigationOpen] = useState(navigationOpenByDefault);
   const [toolsOpen, setToolsOpen] = useState(false);
   const [topic, setTopic] = useState<HelpTopicId>(helpTopic);
-  const [splitPanelOpen, setSplitPanelOpen] = useState(true);
+  const [ownSplitPanelOpen, setOwnSplitPanelOpen] = useState(true);
+  const splitPanelOpen = controlledSplitPanelOpen ?? ownSplitPanelOpen;
   const [splitPanelPreferences, setSplitPanelPreferences] = usePersistedState(
     "splitPanel.preferences",
     DEFAULT_SPLIT_PANEL,
@@ -156,7 +162,10 @@ export function ConsolePage({
         }
         splitPanel={splitPanel}
         splitPanelOpen={splitPanelOpen}
-        onSplitPanelToggle={({ detail }) => setSplitPanelOpen(detail.open)}
+        onSplitPanelToggle={({ detail }) => {
+          setOwnSplitPanelOpen(detail.open);
+          onSplitPanelToggle?.(detail.open);
+        }}
         splitPanelPreferences={splitPanelPreferences}
         onSplitPanelPreferencesChange={({ detail }) => setSplitPanelPreferences(detail)}
         splitPanelSize={splitPanelSize}

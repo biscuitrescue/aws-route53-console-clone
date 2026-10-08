@@ -111,6 +111,7 @@ export function HostedZonesPage() {
   const [sorting, setSorting] = useState<Sorting>(null);
   const [page, setPage] = useState(1);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [panelOpen, setPanelOpen] = useState(false);
   const [deleting, setDeleting] = useState<HostedZoneSummary | null>(null);
 
   // Links copied from the real console use hash routes; send them to the matching page.
@@ -163,6 +164,7 @@ export function HostedZonesPage() {
     {
       id: "created_by",
       header: "Created by",
+      width: 260,
       sortingField: "created_by",
       cell: (zone) => zone.created_by,
     },
@@ -188,6 +190,12 @@ export function HostedZonesPage() {
       cell: (zone) => zone.id,
     },
   ];
+
+  /** Selecting a zone opens its details panel, as in the console. */
+  const select = (zoneId: string | null) => {
+    setSelectedId(zoneId);
+    if (zoneId) setPanelOpen(true);
+  };
 
   const clearFilters = () => {
     setQuery(EMPTY_QUERY);
@@ -228,10 +236,12 @@ export function HostedZonesPage() {
       helpTopic="hosted-zones"
       contentType="table"
       breadcrumbs={[{ text: "Hosted zones", href: routes.hostedZones }]}
+      splitPanelOpen={panelOpen}
+      onSplitPanelToggle={setPanelOpen}
       splitPanel={
         <SplitPanel
           header={selected ? "Hosted zone details" : "0 hosted zones selected"}
-          closeBehavior="hide"
+          closeBehavior="collapse"
         >
           {!selected && <Box>Select a hosted zone to see its details</Box>}
           {selected && details.data && <ZoneDetailsList zone={details.data} />}
@@ -254,8 +264,8 @@ export function HostedZonesPage() {
         empty={empty}
         selectionType="single"
         selectedItems={selected ? [selected] : []}
-        onSelectionChange={({ detail }) => setSelectedId(detail.selectedItems[0]?.id ?? null)}
-        onRowClick={({ detail }) => setSelectedId(detail.item.id)}
+        onSelectionChange={({ detail }) => select(detail.selectedItems[0]?.id ?? null)}
+        onRowClick={({ detail }) => select(detail.item.id)}
         ariaLabels={{
           selectionGroupLabel: "Hosted zones selection",
           itemSelectionLabel: (_data, zone) =>
