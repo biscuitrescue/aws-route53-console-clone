@@ -5,3 +5,4 @@ lib/api/openapi.json
 package-lock.json
 test-results
 playwright-report
+app/theme.generated.css

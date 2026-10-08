@@ -1,8 +1,9 @@
 from fastapi import APIRouter, Response, status
 
 from app.dependencies import CurrentSession, DbSession, SessionToken, SettingsDep
-from app.routers.responses import BAD_REQUEST, UNAUTHORIZED
-from app.schemas.auth import LoginRequest, SessionOut, UserOut
+from app.errors import NotFoundError
+from app.routers.responses import BAD_REQUEST, NOT_FOUND, UNAUTHORIZED
+from app.schemas.auth import DemoCredentials, LoginRequest, SessionOut, UserOut
 from app.services import auth as auth_service
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
@@ -44,3 +45,16 @@ def logout(response: Response, db: DbSession, token: SessionToken, settings: Set
 @router.get("/me", summary="The signed-in user", responses=UNAUTHORIZED)
 def me(session: CurrentSession) -> SessionOut:
     return SessionOut(user=UserOut.model_validate(session.user), expires_at=session.expires_at)
+
+
+@router.get(
+    "/demo-credentials",
+    summary="Credentials of the public demo account",
+    description="Lets the sign-in page of a public demo show how to get in. Returns 404 when "
+    "`R53_DEMO_CREDENTIALS_PUBLIC` is off.",
+    responses=NOT_FOUND,
+)
+def demo_credentials(settings: SettingsDep) -> DemoCredentials:
+    if not settings.demo_credentials_public:
+        raise NotFoundError("Demo credentials are not published on this deployment.")
+    return DemoCredentials(email=settings.demo_email, password=settings.demo_password)

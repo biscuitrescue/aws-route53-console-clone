@@ -1,0 +1,53 @@
+/* The console's footer bar; identical in light and dark mode. */
+.footer {
+  position: sticky;
+  inset-block-end: 0;
+  z-index: 1002;
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  box-sizing: border-box;
+  block-size: 35px;
+  padding-inline: 16px;
+  background: #161d26;
+  color: #c6c6cd;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 14px;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: #dedee3;
+  font: inherit;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.item:hover {
+  color: #ffffff;
+  text-decoration: underline;
+}
+
+.item:focus-visible {
+  outline: 2px solid #42b4ff;
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+.spacer {
+  flex: 1;
+}
+
+@media (max-width: 900px) {
+  .optional {
+    display: none;
+  }
+}

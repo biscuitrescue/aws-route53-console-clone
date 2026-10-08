@@ -77,20 +77,30 @@ export function useChangeRecords(zoneId: string) {
   });
 }
 
+interface ImportRequest {
+  content: string;
+  dryRun: boolean;
+  replaceExisting: boolean;
+}
+
+/** Parse a BIND zone file on the server: a dry run previews it, otherwise it is imported. */
+export function importZoneFile(zoneId: string, request: ImportRequest) {
+  return unwrap(
+    api.POST("/api/v1/hostedzones/{zone_id}/import", {
+      params: { path: { zone_id: zoneId } },
+      body: {
+        content: request.content,
+        dry_run: request.dryRun,
+        replace_existing: request.replaceExisting,
+      },
+    }),
+  );
+}
+
 export function useImportZoneFile(zoneId: string) {
   const invalidate = useInvalidateZone(zoneId);
   return useMutation({
-    mutationFn: (request: { content: string; dryRun: boolean; replaceExisting: boolean }) =>
-      unwrap(
-        api.POST("/api/v1/hostedzones/{zone_id}/import", {
-          params: { path: { zone_id: zoneId } },
-          body: {
-            content: request.content,
-            dry_run: request.dryRun,
-            replace_existing: request.replaceExisting,
-          },
-        }),
-      ),
+    mutationFn: (request: ImportRequest) => importZoneFile(zoneId, request),
     onSuccess: (result) => (result.applied ? invalidate() : undefined),
   });
 }

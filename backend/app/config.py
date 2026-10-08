@@ -21,6 +21,8 @@ class Settings(BaseSettings):
     demo_display_name: str = "demo-admin"
     demo_account_id: str = "111122223333"
     seed_demo_data: bool = True
+    # Let the sign-in page show the demo credentials. Turn off for a private deployment.
+    demo_credentials_public: bool = True
 
     @property
     def session_ttl_seconds(self) -> int:

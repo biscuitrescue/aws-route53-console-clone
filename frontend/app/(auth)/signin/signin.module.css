@@ -1,0 +1,87 @@
+/* The sign-in page sits outside the console frame; its layout follows the AWS sign-in page. */
+.page {
+  min-block-size: 100vh;
+  box-sizing: border-box;
+  padding: 56px 24px 32px;
+  background: #fafafa;
+  color: #0f141a;
+}
+
+:global(.awsui-dark-mode) .page {
+  background: #0f141a;
+  color: #dedee3;
+}
+
+.logo {
+  display: flex;
+  justify-content: center;
+  margin-block-end: 44px;
+  color: #232f3e;
+}
+
+:global(.awsui-dark-mode) .logo {
+  color: #ffffff;
+}
+
+.columns {
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  gap: 24px;
+  flex-wrap: wrap;
+}
+
+.card {
+  inline-size: 340px;
+  max-inline-size: 100%;
+}
+
+.promo {
+  box-sizing: border-box;
+  inline-size: 570px;
+  max-inline-size: 100%;
+  min-block-size: 450px;
+  padding: 96px 42px 48px;
+  background: linear-gradient(160deg, #1a2fb8 0%, #3b3fd6 35%, #5a1fb0 70%, #8a1cc0 100%);
+  color: #ffffff;
+}
+
+.promoTitle {
+  margin: 0 0 16px;
+  font-size: 36px;
+  line-height: 40px;
+  font-weight: 700;
+}
+
+.promoText {
+  margin: 0 0 12px;
+  font-size: 20px;
+  line-height: 28px;
+}
+
+.promoList {
+  margin: 20px 0 0;
+  padding-inline-start: 20px;
+  font-size: 16px;
+  line-height: 26px;
+}
+
+.legal {
+  inline-size: 340px;
+  max-inline-size: 100%;
+  margin: 16px auto 0;
+  color: #424650;
+  font-size: 12px;
+  line-height: 16px;
+  text-align: center;
+}
+
+:global(.awsui-dark-mode) .legal {
+  color: #b4b4bb;
+}
+
+@media (min-width: 990px) {
+  .legal {
+    margin-inline: 0;
+  }
+}

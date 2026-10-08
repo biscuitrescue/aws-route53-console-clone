@@ -22,11 +22,12 @@ export function useHostedZones(params: ZoneListParams) {
   });
 }
 
-export function useHostedZone(zoneId: string) {
+export function useHostedZone(zoneId: string, options: { enabled?: boolean } = {}) {
   return useQuery({
     queryKey: queryKeys.zone(zoneId),
     queryFn: () =>
       unwrap(api.GET("/api/v1/hostedzones/{zone_id}", { params: { path: { zone_id: zoneId } } })),
+    enabled: options.enabled ?? true,
   });
 }
 

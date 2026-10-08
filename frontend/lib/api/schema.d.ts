@@ -72,6 +72,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/auth/demo-credentials": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Credentials of the public demo account
+         * @description Lets the sign-in page of a public demo show how to get in. Returns 404 when `R53_DEMO_CREDENTIALS_PUBLIC` is off.
+         */
+        get: operations["demo_credentials"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/hostedzones": {
         parameters: {
             query?: never;
@@ -301,6 +321,13 @@ export interface components {
              * @description Record sets created or updated
              */
             record_sets: components["schemas"]["RecordSetOut"][];
+        };
+        /** DemoCredentials */
+        DemoCredentials: {
+            /** Email */
+            email: string;
+            /** Password */
+            password: string;
         };
         /** ErrorDetail */
         ErrorDetail: {
@@ -882,6 +909,35 @@ export interface operations {
             };
             /** @description Not signed in or the session expired */
             401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    demo_credentials: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DemoCredentials"];
+                };
+            };
+            /** @description The hosted zone or record does not exist */
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };

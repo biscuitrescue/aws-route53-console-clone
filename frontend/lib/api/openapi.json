@@ -133,6 +133,38 @@
         }
       }
     },
+    "/api/v1/auth/demo-credentials": {
+      "get": {
+        "tags": [
+          "Authentication"
+        ],
+        "summary": "Credentials of the public demo account",
+        "description": "Lets the sign-in page of a public demo show how to get in. Returns 404 when `R53_DEMO_CREDENTIALS_PUBLIC` is off.",
+        "operationId": "demo_credentials",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DemoCredentials"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The hosted zone or record does not exist",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/hostedzones": {
       "get": {
         "tags": [
@@ -1690,6 +1722,24 @@
           "record_sets"
         ],
         "title": "ChangeBatchResult"
+      },
+      "DemoCredentials": {
+        "properties": {
+          "email": {
+            "type": "string",
+            "title": "Email"
+          },
+          "password": {
+            "type": "string",
+            "title": "Password"
+          }
+        },
+        "type": "object",
+        "required": [
+          "email",
+          "password"
+        ],
+        "title": "DemoCredentials"
       },
       "ErrorDetail": {
         "properties": {

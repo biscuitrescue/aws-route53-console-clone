@@ -1,0 +1,261 @@
+"use client";
+
+import AttributeEditor from "@cloudscape-design/components/attribute-editor";
+import Button from "@cloudscape-design/components/button";
+import Container from "@cloudscape-design/components/container";
+import ContentLayout from "@cloudscape-design/components/content-layout";
+import Form from "@cloudscape-design/components/form";
+import FormField from "@cloudscape-design/components/form-field";
+import Header from "@cloudscape-design/components/header";
+import Input from "@cloudscape-design/components/input";
+import Select from "@cloudscape-design/components/select";
+import SpaceBetween from "@cloudscape-design/components/space-between";
+import Textarea from "@cloudscape-design/components/textarea";
+import Tiles from "@cloudscape-design/components/tiles";
+import { useRouter } from "next/navigation";
+import { useState } from "react";
+
+import { ConsolePage } from "@/components/shell/console-page";
+import { InfoLink } from "@/components/shell/help-context";
+import { useNotify } from "@/components/shell/notifications";
+import { useFollow } from "@/hooks/use-follow";
+import { useCreateHostedZone } from "@/hooks/use-hosted-zones";
+import type { VpcAssociation, ZoneType } from "@/lib/api/types";
+import { awsRegions } from "@/lib/aws-regions";
+import { displayName } from "@/lib/format";
+import { routes } from "@/lib/routes";
+
+import { TagsContainer, toApiTags } from "./tags-container";
+import type { EditableTag } from "./tags-container";
+
+export const DESCRIPTION_LIMIT = 256;
+const VALID_CHARACTERS =
+  "Valid characters: a-z, 0-9, ! \" # $ % & ' ( ) * + , - / : ; < = > ? @ [ \\ ] ^ _ ` { | } . ~";
+const EMPTY_VPC: VpcAssociation = { region: "", vpc_id: "" };
+
+export function CreateZonePage() {
+  const router = useRouter();
+  const follow = useFollow();
+  const notify = useNotify();
+  const createZone = useCreateHostedZone();
+
+  const [name, setName] = useState("");
+  const [description, setDescription] = useState("");
+  const [type, setType] = useState<ZoneType>("public");
+  const [vpcs, setVpcs] = useState<VpcAssociation[]>([EMPTY_VPC]);
+  const [tags, setTags] = useState<readonly EditableTag[]>([]);
+  const [submitted, setSubmitted] = useState(false);
+
+  const nameError = submitted && !name.trim() ? "Domain name is empty." : undefined;
+  const vpcsIncomplete =
+    type === "private" && vpcs.some((vpc) => !vpc.region || !vpc.vpc_id.trim());
+
+  const submit = () => {
+    setSubmitted(true);
+    if (!name.trim() || vpcsIncomplete) return;
+    createZone.mutate(
+      {
+        name: name.trim(),
+        description,
+        type,
+        vpcs: type === "private" ? vpcs.map((vpc) => ({ ...vpc, vpc_id: vpc.vpc_id.trim() })) : [],
+        tags: toApiTags(tags),
+      },
+      {
+        onSuccess: (zone) => {
+          notify.success(
+            `${displayName(zone.name)} was successfully created.`,
+            "Now you can create records in the hosted zone to specify how you want Route 53 to route traffic for your domain.",
+          );
+          router.push(routes.hostedZone(zone.id));
+        },
+        onError: notify.error,
+      },
+    );
+  };
+
+  const setVpc = (index: number, change: Partial<VpcAssociation>) => {
+    setVpcs((current) =>
+      current.map((vpc, position) => (position === index ? { ...vpc, ...change } : vpc)),
+    );
+  };
+
+  return (
+    <ConsolePage
+      title="Create hosted zone | Route 53"
+      helpTopic="create-hosted-zone"
+      navigationOpen={false}
+      breadcrumbs={[
+        { text: "Hosted zones", href: routes.hostedZones },
+        { text: "Create hosted zone", href: routes.createHostedZone },
+      ]}
+    >
+      <ContentLayout
+        header={
+          <Header variant="h1" info={<InfoLink topic="create-hosted-zone" />}>
+            Create hosted zone
+          </Header>
+        }
+      >
+        <form
+          onSubmit={(event) => {
+            event.preventDefault();
+            submit();
+          }}
+          noValidate
+        >
+          <Form
+            actions={
+              <SpaceBetween direction="horizontal" size="xs">
+                <Button
+                  variant="link"
+                  href={routes.hostedZones}
+                  onFollow={follow}
+                  formAction="none"
+                >
+                  Cancel
+                </Button>
+                <Button variant="primary" formAction="submit" loading={createZone.isPending}>
+                  Create hosted zone
+                </Button>
+              </SpaceBetween>
+            }
+          >
+            <SpaceBetween size="l">
+              <Container
+                header={
+                  <Header
+                    variant="h2"
+                    description="A hosted zone is a container that holds information about how you want to route traffic for a domain, such as example.com, and its subdomains."
+                  >
+                    Hosted zone configuration
+                  </Header>
+                }
+              >
+                <SpaceBetween size="l">
+                  <FormField
+                    label="Domain name"
+                    info={<InfoLink topic="domain-name" />}
+                    description="This is the name of the domain that you want to route traffic for."
+                    constraintText={VALID_CHARACTERS}
+                    errorText={nameError}
+                  >
+                    <Input
+                      value={name}
+                      placeholder="example.com"
+                      onChange={({ detail }) => setName(detail.value)}
+                      autoFocus
+                      spellcheck={false}
+                    />
+                  </FormField>
+                  <FormField
+                    label={
+                      <>
+                        Description - <i>optional</i>
+                      </>
+                    }
+                    info={<InfoLink topic="description" />}
+                    description="This value lets you distinguish hosted zones that have the same name."
+                    constraintText={`The description can have up to ${DESCRIPTION_LIMIT} characters. ${description.length}/${DESCRIPTION_LIMIT}`}
+                  >
+                    <Textarea
+                      value={description}
+                      placeholder="The hosted zone is used for..."
+                      onChange={({ detail }) =>
+                        setDescription(detail.value.slice(0, DESCRIPTION_LIMIT))
+                      }
+                    />
+                  </FormField>
+                  <FormField
+                    label="Type"
+                    info={<InfoLink topic="zone-type" />}
+                    description="The type indicates whether you want to route traffic on the internet or in an Amazon VPC."
+                  >
+                    <Tiles
+                      value={type}
+                      onChange={({ detail }) => setType(detail.value as ZoneType)}
+                      items={[
+                        {
+                          value: "public",
+                          label: "Public hosted zone",
+                          description:
+                            "A public hosted zone determines how traffic is routed on the internet.",
+                        },
+                        {
+                          value: "private",
+                          label: "Private hosted zone",
+                          description:
+                            "A private hosted zone determines how traffic is routed within an Amazon VPC.",
+                        },
+                      ]}
+                    />
+                  </FormField>
+                </SpaceBetween>
+              </Container>
+
+              {type === "private" && (
+                <Container
+                  header={
+                    <Header
+                      variant="h2"
+                      info={<InfoLink topic="zone-type" />}
+                      description="To use this hosted zone to resolve DNS queries for one or more VPCs, choose the VPCs. To associate a VPC with a hosted zone when the VPC was created using a different AWS account, you must use a programmatic method, such as the AWS CLI."
+                    >
+                      VPCs to associate with the hosted zone
+                    </Header>
+                  }
+                >
+                  <AttributeEditor
+                    items={vpcs}
+                    addButtonText="Add VPC"
+                    removeButtonText="Remove VPC"
+                    isItemRemovable={() => vpcs.length > 1}
+                    onAddButtonClick={() => setVpcs((current) => [...current, EMPTY_VPC])}
+                    onRemoveButtonClick={({ detail }) =>
+                      setVpcs((current) =>
+                        current.filter((_vpc, index) => index !== detail.itemIndex),
+                      )
+                    }
+                    definition={[
+                      {
+                        label: "Region",
+                        control: (vpc, index) => (
+                          <Select
+                            placeholder="Choose region"
+                            selectedOption={
+                              awsRegions.find((region) => region.value === vpc.region) ?? null
+                            }
+                            options={awsRegions}
+                            onChange={({ detail }) =>
+                              setVpc(index, { region: detail.selectedOption.value ?? "" })
+                            }
+                          />
+                        ),
+                        errorText: (vpc) =>
+                          submitted && !vpc.region ? "Choose a Region." : undefined,
+                      },
+                      {
+                        label: "VPC ID",
+                        control: (vpc, index) => (
+                          <Input
+                            value={vpc.vpc_id}
+                            placeholder="vpc-0a1b2c3d4e5f67890"
+                            onChange={({ detail }) => setVpc(index, { vpc_id: detail.value })}
+                          />
+                        ),
+                        errorText: (vpc) =>
+                          submitted && !vpc.vpc_id.trim() ? "Enter a VPC ID." : undefined,
+                      },
+                    ]}
+                  />
+                </Container>
+              )}
+
+              <TagsContainer tags={tags} onChange={setTags} />
+            </SpaceBetween>
+          </Form>
+        </form>
+      </ContentLayout>
+    </ConsolePage>
+  );
+}

@@ -3,14 +3,18 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
+    "generate:theme": "node scripts/generate-theme.mjs",
+    "predev": "npm run generate:theme",
     "dev": "next dev",
+    "prebuild": "npm run generate:theme",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
     "typecheck": "next typegen && tsc --noEmit",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "generate:api": "cd ../backend && uv run python -m app.export_openapi > ../frontend/lib/api/openapi.json && cd ../frontend && openapi-typescript lib/api/openapi.json -o lib/api/schema.d.ts --default-non-nullable false"
+    "generate:api": "cd ../backend && uv run python -m app.export_openapi > ../frontend/lib/api/openapi.json && cd ../frontend && openapi-typescript lib/api/openapi.json -o lib/api/schema.d.ts --default-non-nullable false",
+    "test:e2e": "playwright test"
   },
   "dependencies": {
     "@cloudscape-design/collection-hooks": "^1.0.110",
@@ -33,5 +37,8 @@
     "openapi-typescript": "^7.13.0",
     "prettier": "^3.9.9",
     "typescript": "^5"
+  },
+  "engines": {
+    "node": ">=22.15"
   }
 }

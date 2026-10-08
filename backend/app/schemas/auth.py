@@ -20,3 +20,8 @@ class UserOut(BaseModel):
 class SessionOut(BaseModel):
     user: UserOut
     expires_at: datetime
+
+
+class DemoCredentials(BaseModel):
+    email: str
+    password: str
