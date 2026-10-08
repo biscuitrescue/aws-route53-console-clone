@@ -1,0 +1,2921 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Route 53 Clone API",
+    "description": "\nBackend of the Route 53 console clone. Hosted zones and record sets follow Route 53's\nrules: every zone owns an apex NS and SOA record, CNAMEs cannot share a name with other\nrecords, and change batches are atomic.\n\nSign in with `POST /api/v1/auth/login`; the session travels in an httpOnly cookie.\nErrors always have the shape `{code, message, details}`.\n",
+    "version": "1.0.0"
+  },
+  "paths": {
+    "/api/v1/health": {
+      "get": {
+        "tags": [
+          "Health"
+        ],
+        "summary": "Liveness and database check",
+        "operationId": "health",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthStatus"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/login": {
+      "post": {
+        "tags": [
+          "Authentication"
+        ],
+        "summary": "Sign in and start a session",
+        "operationId": "login",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionOut"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in or the session expired",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request violates a Route 53 rule",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The request body or parameters are malformed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/logout": {
+      "post": {
+        "tags": [
+          "Authentication"
+        ],
+        "summary": "End the current session",
+        "operationId": "logout",
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          }
+        }
+      }
+    },
+    "/api/v1/auth/me": {
+      "get": {
+        "tags": [
+          "Authentication"
+        ],
+        "summary": "The signed-in user",
+        "operationId": "me",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionOut"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in or the session expired",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/hostedzones": {
+      "get": {
+        "tags": [
+          "Hosted zones"
+        ],
+        "summary": "List hosted zones",
+        "operationId": "list_hosted_zones",
+        "parameters": [
+          {
+            "name": "search",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 255
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Free-text search across the main columns",
+              "title": "Search"
+            },
+            "description": "Free-text search across the main columns"
+          },
+          {
+            "name": "type",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/ZoneType"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Only zones of this type",
+              "title": "Type"
+            },
+            "description": "Only zones of this type"
+          },
+          {
+            "name": "filter",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Property filter as `field:operator:value`, repeatable. Operators: eq, ne, contains, not_contains, starts_with, not_starts_with, gt, gte, lt, lte.",
+              "examples": [
+                "name:contains:shop"
+              ],
+              "default": [],
+              "title": "Filter"
+            },
+            "description": "Property filter as `field:operator:value`, repeatable. Operators: eq, ne, contains, not_contains, starts_with, not_starts_with, gt, gte, lt, lte."
+          },
+          {
+            "name": "filter_mode",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "and",
+                "or"
+              ],
+              "type": "string",
+              "description": "Whether all filters must match or any of them",
+              "default": "and",
+              "title": "Filter Mode"
+            },
+            "description": "Whether all filters must match or any of them"
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "description": "name, type, description, id, created_by, record_count or created_at",
+              "default": "name",
+              "title": "Sort"
+            },
+            "description": "name, type, description, id, created_by, record_count or created_at"
+          },
+          {
+            "name": "order",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string",
+              "description": "Sort direction",
+              "default": "asc",
+              "title": "Order"
+            },
+            "description": "Sort direction"
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "1-based page number",
+              "default": 1,
+              "title": "Page"
+            },
+            "description": "1-based page number"
+          },
+          {
+            "name": "page_size",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 500,
+              "minimum": 1,
+              "description": "Items per page",
+              "default": 50,
+              "title": "Page Size"
+            },
+            "description": "Items per page"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_HostedZoneSummary_"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in or the session expired",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request violates a Route 53 rule",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The request body or parameters are malformed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Hosted zones"
+        ],
+        "summary": "Create a hosted zone",
+        "description": "Also creates the apex NS and SOA record sets, as Route 53 does.",
+        "operationId": "create_hosted_zone",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/HostedZoneCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HostedZoneDetail"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in or the session expired",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request violates a Route 53 rule",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The request body or parameters are malformed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/hostedzones/{zone_id}": {
+      "get": {
+        "tags": [
+          "Hosted zones"
+        ],
+        "summary": "Get a hosted zone",
+        "operationId": "get_hosted_zone",
+        "parameters": [
+          {
+            "name": "zone_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Hosted zone ID",
+              "examples": [
+                "Z0123456789ABCDEFGHIJ"
+              ],
+              "title": "Zone Id"
+            },
+            "description": "Hosted zone ID"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HostedZoneDetail"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in or the session expired",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The hosted zone does not exist",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "Hosted zones"
+        ],
+        "summary": "Edit a hosted zone",
+        "description": "Only the description can be changed after a zone is created.",
+        "operationId": "update_hosted_zone",
+        "parameters": [
+          {
+            "name": "zone_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Hosted zone ID",
+              "examples": [
+                "Z0123456789ABCDEFGHIJ"
+              ],
+              "title": "Zone Id"
+            },
+            "description": "Hosted zone ID"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/HostedZoneUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HostedZoneDetail"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in or the session expired",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The hosted zone does not exist",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request violates a Route 53 rule",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The request body or parameters are malformed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Hosted zones"
+        ],
+        "summary": "Delete a hosted zone",
+        "description": "Fails with `HostedZoneNotEmpty` while the zone has records besides the apex NS and SOA.",
+        "operationId": "delete_hosted_zone",
+        "parameters": [
+          {
+            "name": "zone_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Hosted zone ID",
+              "examples": [
+                "Z0123456789ABCDEFGHIJ"
+              ],
+              "title": "Zone Id"
+            },
+            "description": "Hosted zone ID"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "401": {
+            "description": "Not signed in or the session expired",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The hosted zone does not exist",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The change conflicts with existing data",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/hostedzones/{zone_id}/tags": {
+      "get": {
+        "tags": [
+          "Hosted zones",
+          "Tags"
+        ],
+        "summary": "List a zone's tags",
+        "operationId": "list_tags",
+        "parameters": [
+          {
+            "name": "zone_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Hosted zone ID",
+              "examples": [
+                "Z0123456789ABCDEFGHIJ"
+              ],
+              "title": "Zone Id"
+            },
+            "description": "Hosted zone ID"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TagList"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in or the session expired",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The hosted zone does not exist",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Hosted zones",
+          "Tags"
+        ],
+        "summary": "Replace a zone's tags",
+        "operationId": "replace_tags",
+        "parameters": [
+          {
+            "name": "zone_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Hosted zone ID",
+              "examples": [
+                "Z0123456789ABCDEFGHIJ"
+              ],
+              "title": "Zone Id"
+            },
+            "description": "Hosted zone ID"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TagsUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TagList"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in or the session expired",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The hosted zone does not exist",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request violates a Route 53 rule",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The request body or parameters are malformed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/hostedzones/{zone_id}/records": {
+      "get": {
+        "tags": [
+          "Records"
+        ],
+        "summary": "List the records of a hosted zone",
+        "operationId": "list_records",
+        "parameters": [
+          {
+            "name": "zone_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Hosted zone ID",
+              "examples": [
+                "Z0123456789ABCDEFGHIJ"
+              ],
+              "title": "Zone Id"
+            },
+            "description": "Hosted zone ID"
+          },
+          {
+            "name": "search",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 255
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Free-text search across the main columns",
+              "title": "Search"
+            },
+            "description": "Free-text search across the main columns"
+          },
+          {
+            "name": "type",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/components/schemas/RecordType"
+              },
+              "description": "Only these record types; repeatable",
+              "default": [],
+              "title": "Type"
+            },
+            "description": "Only these record types; repeatable"
+          },
+          {
+            "name": "filter",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Property filter as `field:operator:value`, repeatable. Operators: eq, ne, contains, not_contains, starts_with, not_starts_with, gt, gte, lt, lte.",
+              "examples": [
+                "name:contains:shop"
+              ],
+              "default": [],
+              "title": "Filter"
+            },
+            "description": "Property filter as `field:operator:value`, repeatable. Operators: eq, ne, contains, not_contains, starts_with, not_starts_with, gt, gte, lt, lte."
+          },
+          {
+            "name": "filter_mode",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "and",
+                "or"
+              ],
+              "type": "string",
+              "description": "Whether all filters must match or any of them",
+              "default": "and",
+              "title": "Filter Mode"
+            },
+            "description": "Whether all filters must match or any of them"
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "description": "default (Route 53 order), name, type, ttl, routing_policy, set_identifier, alias or id",
+              "default": "default",
+              "title": "Sort"
+            },
+            "description": "default (Route 53 order), name, type, ttl, routing_policy, set_identifier, alias or id"
+          },
+          {
+            "name": "order",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string",
+              "description": "Sort direction",
+              "default": "asc",
+              "title": "Order"
+            },
+            "description": "Sort direction"
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "1-based page number",
+              "default": 1,
+              "title": "Page"
+            },
+            "description": "1-based page number"
+          },
+          {
+            "name": "page_size",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 500,
+              "minimum": 1,
+              "description": "Items per page",
+              "default": 50,
+              "title": "Page Size"
+            },
+            "description": "Items per page"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_RecordSetOut_"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in or the session expired",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The hosted zone or record does not exist",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request violates a Route 53 rule",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The request body or parameters are malformed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Records"
+        ],
+        "summary": "Create a record",
+        "operationId": "create_record",
+        "parameters": [
+          {
+            "name": "zone_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Hosted zone ID",
+              "examples": [
+                "Z0123456789ABCDEFGHIJ"
+              ],
+              "title": "Zone Id"
+            },
+            "description": "Hosted zone ID"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RecordSetInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RecordSetOut"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in or the session expired",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The hosted zone or record does not exist",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request violates a Route 53 rule",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The request body or parameters are malformed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The change conflicts with existing data",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/hostedzones/{zone_id}/records:batch": {
+      "post": {
+        "tags": [
+          "Records"
+        ],
+        "summary": "Apply a change batch atomically",
+        "description": "CREATE, UPSERT and DELETE changes run in order in one transaction, like `ChangeResourceRecordSets`. If any change is invalid, none is applied and every failure is listed in `details` with the index of its change.",
+        "operationId": "change_records",
+        "parameters": [
+          {
+            "name": "zone_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Hosted zone ID",
+              "examples": [
+                "Z0123456789ABCDEFGHIJ"
+              ],
+              "title": "Zone Id"
+            },
+            "description": "Hosted zone ID"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChangeBatchRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChangeBatchResult"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in or the session expired",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The hosted zone or record does not exist",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request violates a Route 53 rule",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The request body or parameters are malformed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/hostedzones/{zone_id}/records/{record_id}": {
+      "get": {
+        "tags": [
+          "Records"
+        ],
+        "summary": "Get a record",
+        "operationId": "get_record",
+        "parameters": [
+          {
+            "name": "record_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Record ID",
+              "title": "Record Id"
+            },
+            "description": "Record ID"
+          },
+          {
+            "name": "zone_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Hosted zone ID",
+              "examples": [
+                "Z0123456789ABCDEFGHIJ"
+              ],
+              "title": "Zone Id"
+            },
+            "description": "Hosted zone ID"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RecordSetOut"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in or the session expired",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The hosted zone or record does not exist",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "Records"
+        ],
+        "summary": "Edit a record",
+        "description": "Omitted fields keep their value. The apex NS and SOA records can be edited but not renamed or retyped.",
+        "operationId": "update_record",
+        "parameters": [
+          {
+            "name": "record_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Record ID",
+              "title": "Record Id"
+            },
+            "description": "Record ID"
+          },
+          {
+            "name": "zone_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Hosted zone ID",
+              "examples": [
+                "Z0123456789ABCDEFGHIJ"
+              ],
+              "title": "Zone Id"
+            },
+            "description": "Hosted zone ID"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RecordSetUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RecordSetOut"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in or the session expired",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The hosted zone or record does not exist",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request violates a Route 53 rule",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The request body or parameters are malformed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The change conflicts with existing data",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Records"
+        ],
+        "summary": "Delete a record",
+        "description": "The apex NS and SOA records cannot be deleted.",
+        "operationId": "delete_record",
+        "parameters": [
+          {
+            "name": "record_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Record ID",
+              "title": "Record Id"
+            },
+            "description": "Record ID"
+          },
+          {
+            "name": "zone_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Hosted zone ID",
+              "examples": [
+                "Z0123456789ABCDEFGHIJ"
+              ],
+              "title": "Zone Id"
+            },
+            "description": "Hosted zone ID"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "401": {
+            "description": "Not signed in or the session expired",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The hosted zone or record does not exist",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request violates a Route 53 rule",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The request body or parameters are malformed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/hostedzones/{zone_id}/export": {
+      "get": {
+        "tags": [
+          "Import and export"
+        ],
+        "summary": "Export a hosted zone",
+        "description": "`bind` returns a zone file; `json` returns the zone and its record sets in the shape of the AWS CLI's `list-resource-record-sets`.",
+        "operationId": "export_zone",
+        "parameters": [
+          {
+            "name": "zone_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Hosted zone ID",
+              "examples": [
+                "Z0123456789ABCDEFGHIJ"
+              ],
+              "title": "Zone Id"
+            },
+            "description": "Hosted zone ID"
+          },
+          {
+            "name": "format",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "bind",
+                "json"
+              ],
+              "type": "string",
+              "default": "bind",
+              "title": "Format"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The exported zone as a file download",
+            "content": {
+              "text/plain": {},
+              "application/json": {}
+            }
+          },
+          "401": {
+            "description": "Not signed in or the session expired",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The hosted zone does not exist",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/hostedzones/{zone_id}/import": {
+      "post": {
+        "tags": [
+          "Import and export"
+        ],
+        "summary": "Import records from a BIND zone file",
+        "description": "With `dry_run` (the default) the file is parsed and validated and a preview is returned. Without it the records are created in one atomic change batch; the apex NS and SOA in the file are skipped.",
+        "operationId": "import_zone_file",
+        "parameters": [
+          {
+            "name": "zone_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Hosted zone ID",
+              "examples": [
+                "Z0123456789ABCDEFGHIJ"
+              ],
+              "title": "Zone Id"
+            },
+            "description": "Hosted zone ID"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ZoneFileImportRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ZoneFileImportResult"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in or the session expired",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The hosted zone does not exist",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request violates a Route 53 rule",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The request body or parameters are malformed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "AliasTarget": {
+        "properties": {
+          "dns_name": {
+            "type": "string",
+            "maxLength": 255,
+            "minLength": 1,
+            "title": "Dns Name"
+          },
+          "hosted_zone_id": {
+            "type": "string",
+            "maxLength": 32,
+            "minLength": 1,
+            "title": "Hosted Zone Id"
+          },
+          "evaluate_target_health": {
+            "type": "boolean",
+            "title": "Evaluate Target Health",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "dns_name",
+          "hosted_zone_id"
+        ],
+        "title": "AliasTarget"
+      },
+      "Change": {
+        "properties": {
+          "action": {
+            "$ref": "#/components/schemas/ChangeAction"
+          },
+          "record_set": {
+            "$ref": "#/components/schemas/RecordSetInput"
+          }
+        },
+        "type": "object",
+        "required": [
+          "action",
+          "record_set"
+        ],
+        "title": "Change"
+      },
+      "ChangeAction": {
+        "type": "string",
+        "enum": [
+          "CREATE",
+          "UPSERT",
+          "DELETE"
+        ],
+        "title": "ChangeAction"
+      },
+      "ChangeBatchRequest": {
+        "properties": {
+          "comment": {
+            "type": "string",
+            "maxLength": 256,
+            "title": "Comment",
+            "default": ""
+          },
+          "changes": {
+            "items": {
+              "$ref": "#/components/schemas/Change"
+            },
+            "type": "array",
+            "maxItems": 1000,
+            "minItems": 1,
+            "title": "Changes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "changes"
+        ],
+        "title": "ChangeBatchRequest"
+      },
+      "ChangeBatchResult": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "title": "Status",
+            "description": "Changes apply immediately in the clone",
+            "default": "INSYNC"
+          },
+          "comment": {
+            "type": "string",
+            "title": "Comment"
+          },
+          "submitted_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Submitted At"
+          },
+          "created": {
+            "type": "integer",
+            "title": "Created"
+          },
+          "updated": {
+            "type": "integer",
+            "title": "Updated"
+          },
+          "deleted": {
+            "type": "integer",
+            "title": "Deleted"
+          },
+          "record_sets": {
+            "items": {
+              "$ref": "#/components/schemas/RecordSetOut"
+            },
+            "type": "array",
+            "title": "Record Sets",
+            "description": "Record sets created or updated"
+          }
+        },
+        "type": "object",
+        "required": [
+          "comment",
+          "submitted_at",
+          "created",
+          "updated",
+          "deleted",
+          "record_sets"
+        ],
+        "title": "ChangeBatchResult"
+      },
+      "ErrorDetail": {
+        "properties": {
+          "field": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Field",
+            "description": "Request field the problem relates to"
+          },
+          "index": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Index",
+            "description": "Position of the failing batch change"
+          },
+          "line": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Line",
+            "description": "Zone file line the problem relates to"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "message"
+        ],
+        "title": "ErrorDetail"
+      },
+      "ErrorResponse": {
+        "properties": {
+          "code": {
+            "type": "string",
+            "title": "Code",
+            "examples": [
+              "NoSuchHostedZone"
+            ]
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          },
+          "details": {
+            "items": {
+              "$ref": "#/components/schemas/ErrorDetail"
+            },
+            "type": "array",
+            "title": "Details",
+            "default": []
+          }
+        },
+        "type": "object",
+        "required": [
+          "code",
+          "message"
+        ],
+        "title": "ErrorResponse"
+      },
+      "FailoverRole": {
+        "type": "string",
+        "enum": [
+          "PRIMARY",
+          "SECONDARY"
+        ],
+        "title": "FailoverRole"
+      },
+      "GeoLocation": {
+        "properties": {
+          "continent_code": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 2
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Continent Code"
+          },
+          "country_code": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 2
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Country Code"
+          },
+          "subdivision_code": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 3
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Subdivision Code"
+          }
+        },
+        "type": "object",
+        "title": "GeoLocation"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
+      "HealthStatus": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "database": {
+            "type": "string",
+            "title": "Database"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status",
+          "database"
+        ],
+        "title": "HealthStatus"
+      },
+      "HostedZoneCreate": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 1024,
+            "minLength": 1,
+            "title": "Name",
+            "examples": [
+              "example.com"
+            ]
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 256,
+            "title": "Description",
+            "default": ""
+          },
+          "type": {
+            "$ref": "#/components/schemas/ZoneType",
+            "default": "public"
+          },
+          "vpcs": {
+            "items": {
+              "$ref": "#/components/schemas/VpcAssociation"
+            },
+            "type": "array",
+            "title": "Vpcs",
+            "default": []
+          },
+          "tags": {
+            "items": {
+              "$ref": "#/components/schemas/Tag"
+            },
+            "type": "array",
+            "title": "Tags",
+            "default": []
+          }
+        },
+        "type": "object",
+        "required": [
+          "name"
+        ],
+        "title": "HostedZoneCreate"
+      },
+      "HostedZoneDetail": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id",
+            "examples": [
+              "Z0123456789ABCDEFGHIJ"
+            ]
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Canonical zone name with trailing dot",
+            "examples": [
+              "example.com."
+            ]
+          },
+          "type": {
+            "$ref": "#/components/schemas/ZoneType"
+          },
+          "description": {
+            "type": "string",
+            "title": "Description"
+          },
+          "created_by": {
+            "type": "string",
+            "title": "Created By"
+          },
+          "record_count": {
+            "type": "integer",
+            "title": "Record Count"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          },
+          "caller_reference": {
+            "type": "string",
+            "title": "Caller Reference"
+          },
+          "name_servers": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Name Servers"
+          },
+          "vpcs": {
+            "items": {
+              "$ref": "#/components/schemas/VpcAssociation"
+            },
+            "type": "array",
+            "title": "Vpcs"
+          },
+          "tags": {
+            "items": {
+              "$ref": "#/components/schemas/Tag"
+            },
+            "type": "array",
+            "title": "Tags"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "type",
+          "description",
+          "created_by",
+          "record_count",
+          "created_at",
+          "updated_at",
+          "caller_reference",
+          "name_servers",
+          "vpcs",
+          "tags"
+        ],
+        "title": "HostedZoneDetail"
+      },
+      "HostedZoneSummary": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id",
+            "examples": [
+              "Z0123456789ABCDEFGHIJ"
+            ]
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Canonical zone name with trailing dot",
+            "examples": [
+              "example.com."
+            ]
+          },
+          "type": {
+            "$ref": "#/components/schemas/ZoneType"
+          },
+          "description": {
+            "type": "string",
+            "title": "Description"
+          },
+          "created_by": {
+            "type": "string",
+            "title": "Created By"
+          },
+          "record_count": {
+            "type": "integer",
+            "title": "Record Count"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "type",
+          "description",
+          "created_by",
+          "record_count",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "HostedZoneSummary"
+      },
+      "HostedZoneUpdate": {
+        "properties": {
+          "description": {
+            "type": "string",
+            "maxLength": 256,
+            "title": "Description"
+          }
+        },
+        "type": "object",
+        "required": [
+          "description"
+        ],
+        "title": "HostedZoneUpdate"
+      },
+      "ImportSummary": {
+        "properties": {
+          "create": {
+            "type": "integer",
+            "title": "Create",
+            "default": 0
+          },
+          "replace": {
+            "type": "integer",
+            "title": "Replace",
+            "default": 0
+          },
+          "skip": {
+            "type": "integer",
+            "title": "Skip",
+            "default": 0
+          },
+          "error": {
+            "type": "integer",
+            "title": "Error",
+            "default": 0
+          }
+        },
+        "type": "object",
+        "title": "ImportSummary"
+      },
+      "ImportedRecordSet": {
+        "properties": {
+          "line": {
+            "type": "integer",
+            "title": "Line"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "type": {
+            "$ref": "#/components/schemas/RecordType"
+          },
+          "ttl": {
+            "type": "integer",
+            "title": "Ttl"
+          },
+          "values": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Values"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "create",
+              "replace",
+              "skip",
+              "error"
+            ],
+            "title": "Status"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          }
+        },
+        "type": "object",
+        "required": [
+          "line",
+          "name",
+          "type",
+          "ttl",
+          "values",
+          "status"
+        ],
+        "title": "ImportedRecordSet"
+      },
+      "LoginRequest": {
+        "properties": {
+          "email": {
+            "type": "string",
+            "maxLength": 254,
+            "minLength": 1,
+            "title": "Email",
+            "examples": [
+              "demo@example.com"
+            ]
+          },
+          "password": {
+            "type": "string",
+            "maxLength": 256,
+            "minLength": 1,
+            "title": "Password"
+          }
+        },
+        "type": "object",
+        "required": [
+          "email",
+          "password"
+        ],
+        "title": "LoginRequest"
+      },
+      "Page_HostedZoneSummary_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/HostedZoneSummary"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total",
+            "description": "Number of items matching the query across all pages"
+          },
+          "page": {
+            "type": "integer",
+            "title": "Page"
+          },
+          "page_size": {
+            "type": "integer",
+            "title": "Page Size"
+          },
+          "pages": {
+            "type": "integer",
+            "title": "Pages"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "total",
+          "page",
+          "page_size",
+          "pages"
+        ],
+        "title": "Page[HostedZoneSummary]"
+      },
+      "Page_RecordSetOut_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/RecordSetOut"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total",
+            "description": "Number of items matching the query across all pages"
+          },
+          "page": {
+            "type": "integer",
+            "title": "Page"
+          },
+          "page_size": {
+            "type": "integer",
+            "title": "Page Size"
+          },
+          "pages": {
+            "type": "integer",
+            "title": "Pages"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "total",
+          "page",
+          "page_size",
+          "pages"
+        ],
+        "title": "Page[RecordSetOut]"
+      },
+      "RecordSetInput": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 1024,
+            "title": "Name",
+            "description": "Relative to the zone (`www`), fully qualified, or empty / `@` for the apex",
+            "default": ""
+          },
+          "type": {
+            "$ref": "#/components/schemas/RecordType"
+          },
+          "ttl": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ttl",
+            "description": "Seconds; required unless alias"
+          },
+          "values": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Values",
+            "description": "One entry per value; empty for alias",
+            "default": []
+          },
+          "routing_policy": {
+            "$ref": "#/components/schemas/RoutingPolicy",
+            "default": "simple"
+          },
+          "set_identifier": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 128
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Set Identifier"
+          },
+          "weight": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Weight"
+          },
+          "region": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 32
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Region"
+          },
+          "failover": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FailoverRole"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "geolocation": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/GeoLocation"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "health_check_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 64
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Health Check Id"
+          },
+          "alias_target": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AliasTarget"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "type"
+        ],
+        "title": "RecordSetInput",
+        "description": "A complete record set, as accepted by create and by change batches."
+      },
+      "RecordSetOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "zone_id": {
+            "type": "string",
+            "title": "Zone Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Canonical FQDN with trailing dot",
+            "examples": [
+              "www.example.com."
+            ]
+          },
+          "type": {
+            "$ref": "#/components/schemas/RecordType"
+          },
+          "ttl": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ttl"
+          },
+          "values": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Values"
+          },
+          "routing_policy": {
+            "$ref": "#/components/schemas/RoutingPolicy"
+          },
+          "set_identifier": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Set Identifier"
+          },
+          "weight": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Weight"
+          },
+          "region": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Region"
+          },
+          "failover": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FailoverRole"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "geolocation": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/GeoLocation"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "health_check_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Health Check Id"
+          },
+          "alias": {
+            "type": "boolean",
+            "title": "Alias"
+          },
+          "alias_target": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AliasTarget"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "zone_id",
+          "name",
+          "type",
+          "ttl",
+          "values",
+          "routing_policy",
+          "set_identifier",
+          "weight",
+          "region",
+          "failover",
+          "geolocation",
+          "health_check_id",
+          "alias",
+          "alias_target",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "RecordSetOut"
+      },
+      "RecordSetUpdate": {
+        "properties": {
+          "name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 1024
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "type": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RecordType"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "ttl": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ttl"
+          },
+          "values": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Values"
+          },
+          "routing_policy": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RoutingPolicy"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "set_identifier": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 128
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Set Identifier"
+          },
+          "weight": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Weight"
+          },
+          "region": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 32
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Region"
+          },
+          "failover": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FailoverRole"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "geolocation": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/GeoLocation"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "health_check_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 64
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Health Check Id"
+          },
+          "alias_target": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AliasTarget"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "title": "RecordSetUpdate",
+        "description": "Partial update; omitted fields keep their current value."
+      },
+      "RecordType": {
+        "type": "string",
+        "enum": [
+          "A",
+          "AAAA",
+          "CAA",
+          "CNAME",
+          "MX",
+          "NS",
+          "PTR",
+          "SOA",
+          "SRV",
+          "TXT"
+        ],
+        "title": "RecordType"
+      },
+      "RoutingPolicy": {
+        "type": "string",
+        "enum": [
+          "simple",
+          "weighted",
+          "latency",
+          "failover",
+          "geolocation",
+          "multivalue"
+        ],
+        "title": "RoutingPolicy"
+      },
+      "SessionOut": {
+        "properties": {
+          "user": {
+            "$ref": "#/components/schemas/UserOut"
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Expires At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "user",
+          "expires_at"
+        ],
+        "title": "SessionOut"
+      },
+      "Tag": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Key"
+          },
+          "value": {
+            "type": "string",
+            "maxLength": 256,
+            "title": "Value",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "required": [
+          "key"
+        ],
+        "title": "Tag"
+      },
+      "TagList": {
+        "properties": {
+          "tags": {
+            "items": {
+              "$ref": "#/components/schemas/Tag"
+            },
+            "type": "array",
+            "title": "Tags"
+          }
+        },
+        "type": "object",
+        "required": [
+          "tags"
+        ],
+        "title": "TagList"
+      },
+      "TagsUpdate": {
+        "properties": {
+          "tags": {
+            "items": {
+              "$ref": "#/components/schemas/Tag"
+            },
+            "type": "array",
+            "title": "Tags"
+          }
+        },
+        "type": "object",
+        "required": [
+          "tags"
+        ],
+        "title": "TagsUpdate"
+      },
+      "UserOut": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "email": {
+            "type": "string",
+            "title": "Email"
+          },
+          "display_name": {
+            "type": "string",
+            "title": "Display Name"
+          },
+          "account_id": {
+            "type": "string",
+            "title": "Account Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "email",
+          "display_name",
+          "account_id"
+        ],
+        "title": "UserOut"
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "ctx": {
+            "type": "object",
+            "title": "Context"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError"
+      },
+      "VpcAssociation": {
+        "properties": {
+          "vpc_id": {
+            "type": "string",
+            "maxLength": 32,
+            "minLength": 1,
+            "title": "Vpc Id",
+            "examples": [
+              "vpc-0a1b2c3d4e5f67890"
+            ]
+          },
+          "region": {
+            "type": "string",
+            "maxLength": 32,
+            "minLength": 1,
+            "title": "Region",
+            "examples": [
+              "us-east-1"
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "vpc_id",
+          "region"
+        ],
+        "title": "VpcAssociation"
+      },
+      "ZoneFileImportRequest": {
+        "properties": {
+          "content": {
+            "type": "string",
+            "maxLength": 1000000,
+            "minLength": 1,
+            "title": "Content"
+          },
+          "dry_run": {
+            "type": "boolean",
+            "title": "Dry Run",
+            "description": "Validate and preview without saving",
+            "default": true
+          },
+          "replace_existing": {
+            "type": "boolean",
+            "title": "Replace Existing",
+            "description": "Overwrite record sets that already exist in the zone",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "content"
+        ],
+        "title": "ZoneFileImportRequest"
+      },
+      "ZoneFileImportResult": {
+        "properties": {
+          "dry_run": {
+            "type": "boolean",
+            "title": "Dry Run"
+          },
+          "applied": {
+            "type": "boolean",
+            "title": "Applied"
+          },
+          "summary": {
+            "$ref": "#/components/schemas/ImportSummary"
+          },
+          "record_sets": {
+            "items": {
+              "$ref": "#/components/schemas/ImportedRecordSet"
+            },
+            "type": "array",
+            "title": "Record Sets"
+          },
+          "errors": {
+            "items": {
+              "$ref": "#/components/schemas/ErrorDetail"
+            },
+            "type": "array",
+            "title": "Errors",
+            "description": "Syntax errors, by zone file line"
+          }
+        },
+        "type": "object",
+        "required": [
+          "dry_run",
+          "applied",
+          "summary",
+          "record_sets",
+          "errors"
+        ],
+        "title": "ZoneFileImportResult"
+      },
+      "ZoneType": {
+        "type": "string",
+        "enum": [
+          "public",
+          "private"
+        ],
+        "title": "ZoneType"
+      }
+    }
+  }
+}
