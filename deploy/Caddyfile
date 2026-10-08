@@ -1,0 +1,16 @@
+# Caddy terminates TLS and forwards everything to Next.js, which proxies /api to FastAPI.
+# SITE_ADDRESS is a host name (for example 203-0-113-10.sslip.io), so Caddy obtains and
+# renews a Let's Encrypt certificate for it automatically.
+{$SITE_ADDRESS} {
+	encode zstd gzip
+
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		-Server
+	}
+
+	reverse_proxy frontend:3000
+}

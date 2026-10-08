@@ -1,0 +1,53 @@
+# Production stack for one small VM: Caddy (TLS) -> Next.js -> FastAPI -> SQLite on disk.
+# Values come from the .env file next to this file (see .env.example); deploy.sh writes it.
+name: route53-clone
+
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+services:
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    environment:
+      SITE_ADDRESS: ${SITE_ADDRESS:?set SITE_ADDRESS to the public host name}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - frontend
+    logging: *logging
+
+  frontend:
+    image: ${IMAGE_PREFIX:?set IMAGE_PREFIX to the Artifact Registry path}/frontend:${IMAGE_TAG:-latest}
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_healthy
+    logging: *logging
+
+  backend:
+    image: ${IMAGE_PREFIX}/backend:${IMAGE_TAG:-latest}
+    restart: unless-stopped
+    environment:
+      R53_ENVIRONMENT: production
+      R53_COOKIE_SECURE: "true"
+      R53_DATABASE_URL: sqlite:////data/route53.db
+      R53_DEMO_EMAIL: ${DEMO_EMAIL:-demo@example.com}
+      R53_DEMO_PASSWORD: ${DEMO_PASSWORD:?set DEMO_PASSWORD for the demo account}
+    volumes:
+      # The live database sits on the VM's persistent disk, never in the container.
+      - ${DATA_DIR:-/srv/route53/data}:/data
+    logging: *logging
+
+volumes:
+  caddy_data:
+  caddy_config:
