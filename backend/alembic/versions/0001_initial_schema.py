@@ -35,6 +35,7 @@ def upgrade() -> None:
         sa.Column("id", sa.String(length=32), nullable=False),
         sa.Column("owner_id", sa.Integer(), nullable=False),
         sa.Column("name", sa.String(length=255), nullable=False),
+        sa.Column("sort_key", sa.String(length=255), nullable=False),
         sa.Column("type", sa.String(length=16), nullable=False),
         sa.Column("description", sa.String(length=256), nullable=False),
         sa.Column("caller_reference", sa.String(length=128), nullable=False),

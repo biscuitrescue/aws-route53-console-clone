@@ -4,16 +4,18 @@ from collections.abc import Sequence
 from dataclasses import dataclass, field
 from typing import Any
 
-from sqlalchemy import SQLColumnExpression, func, or_, select
+from sqlalchemy import ColumnElement, SQLColumnExpression, func, not_, or_, select
 from sqlalchemy.orm import Session, selectinload
 
 from app.domain.enums import ZoneType
+from app.errors import InvalidInputError
 from app.models import HostedZone, RecordSet
 from app.repositories import records as record_repository
 from app.repositories.filtering import (
     LIKE_ESCAPE,
     Condition,
     FilterClause,
+    FilterOperator,
     build_filter,
     contains_pattern,
     count_rows,
@@ -31,7 +33,23 @@ _RECORD_COUNT = (
     .scalar_subquery()
 )
 
+
+def _any_condition(operator: FilterOperator, value: str) -> ColumnElement[bool]:
+    """Free text: match the name, description or ID."""
+    negated = operator is FilterOperator.NOT_CONTAINS
+    if operator not in (FilterOperator.CONTAINS, FilterOperator.NOT_CONTAINS):
+        raise InvalidInputError("Free-text filters support only contains", field="filter")
+    pattern = contains_pattern(value)
+    matches = or_(
+        HostedZone.name.ilike(pattern, escape=LIKE_ESCAPE),
+        HostedZone.description.ilike(pattern, escape=LIKE_ESCAPE),
+        HostedZone.id.ilike(pattern, escape=LIKE_ESCAPE),
+    )
+    return not_(matches) if negated else matches
+
+
 _FILTER_FIELDS: dict[str, Condition] = {
+    "any": _any_condition,
     "name": fqdn_condition(HostedZone.name),
     "type": text_condition(HostedZone.type),
     "description": text_condition(HostedZone.description),
@@ -40,8 +58,9 @@ _FILTER_FIELDS: dict[str, Condition] = {
     "record_count": number_condition(_RECORD_COUNT),
 }
 
+# Names sort the way Route 53 lists them: by domain, parent before child.
 _SORT_FIELDS: dict[str, SQLColumnExpression[Any]] = {
-    "name": HostedZone.name,
+    "name": HostedZone.sort_key,
     "type": HostedZone.type,
     "description": HostedZone.description.collate("NOCASE"),
     "id": HostedZone.id,
@@ -75,14 +94,7 @@ def list_zones(
         HostedZone.owner_id == owner_id
     )
     if search:
-        pattern = contains_pattern(search)
-        statement = statement.where(
-            or_(
-                HostedZone.name.ilike(pattern, escape=LIKE_ESCAPE),
-                HostedZone.description.ilike(pattern, escape=LIKE_ESCAPE),
-                HostedZone.id.ilike(pattern, escape=LIKE_ESCAPE),
-            )
-        )
+        statement = statement.where(_any_condition(FilterOperator.CONTAINS, search))
     if zone_type is not None:
         statement = statement.where(HostedZone.type == zone_type.value)
     filter_condition = build_filter(filters, _FILTER_FIELDS, filter_mode)

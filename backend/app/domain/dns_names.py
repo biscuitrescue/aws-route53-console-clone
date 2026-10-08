@@ -16,27 +16,34 @@ class DnsNameError(ValueError):
     """Raised when a domain name is malformed."""
 
 
-def _validate_labels(labels: list[str], *, allow_wildcard: bool) -> None:
-    for position, label in enumerate(labels):
+def _problem(code: str, description: str, name: str) -> DnsNameError:
+    """Route 53's wording: ``DomainLabelEmpty (Domain label is empty) encountered with 'a..b'``."""
+    return DnsNameError(f"{code} ({description}) encountered with '{name}'")
+
+
+def _validate_labels(name: str, *, allow_wildcard: bool) -> None:
+    for position, label in enumerate(name.split(".")):
         if not label:
-            raise DnsNameError("Domain name contains an empty label")
+            raise _problem("DomainLabelEmpty", "Domain label is empty", name)
         if len(label) > MAX_LABEL_LENGTH:
-            raise DnsNameError(f"Domain label is too long (maximum {MAX_LABEL_LENGTH} characters)")
+            raise _problem("DomainLabelTooLong", "Domain label is too long", name)
         if label == WILDCARD:
             if allow_wildcard and position == 0:
                 continue
-            raise DnsNameError("The wildcard character (*) is only allowed as the leftmost label")
+            raise _problem(
+                "InvalidDomainName", "The wildcard is only allowed as the leftmost label", name
+            )
         if not _LABEL_RE.match(label):
-            raise DnsNameError(f"Domain label '{label}' contains invalid characters")
+            raise _problem("InvalidDomainName", "Domain name contains invalid characters", name)
 
 
 def _canonical(raw: str, *, allow_wildcard: bool) -> str:
     name = raw.strip().lower().removesuffix(".")
     if not name:
-        raise DnsNameError("Domain name is required")
+        raise DnsNameError("Domain name is empty.")
     if len(name) > MAX_NAME_LENGTH:
-        raise DnsNameError(f"Domain name is too long (maximum {MAX_NAME_LENGTH} characters)")
-    _validate_labels(name.split("."), allow_wildcard=allow_wildcard)
+        raise _problem("DomainNameTooLong", "Domain name is too long", name)
+    _validate_labels(name, allow_wildcard=allow_wildcard)
     return f"{name}."
 
 

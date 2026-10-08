@@ -97,7 +97,7 @@ def test_multiple_values_keep_their_order(client: TestClient, zone: dict[str, An
             "TTL must be between 0 and 2147483647",
         ),
         ({"name": "www", "type": "A", "values": ["192.0.2.1"], "ttl": None}, "ttl", "required"),
-        ({"name": "a..b", "type": "A", "values": ["192.0.2.1"]}, "name", "empty label"),
+        ({"name": "a..b", "type": "A", "values": ["192.0.2.1"]}, "name", "Domain label is empty"),
         (
             {"name": "www.example.org.", "type": "A", "values": ["192.0.2.1"]},
             "name",
@@ -337,6 +337,8 @@ def test_records_belong_to_their_zone(client: TestClient, zone: dict[str, Any]) 
             ["10.example.com. PTR", "www.example.com. A"],
         ),
         ({"filter": ["name:contains:www", "type:ne:A"]}, ["www.example.com. AAAA"]),
+        ({"filter": ["any:contains:www", "any:contains:blog"]}, ["blog.example.com. CNAME"]),
+        ({"filter": ["any:contains:sip", "any:not_contains:_tcp"]}, []),
     ],
 )
 def test_search_and_filters(
@@ -354,8 +356,8 @@ def test_value_filter_can_be_negated(client: TestClient, populated: dict[str, An
 @pytest.mark.parametrize(
     ("params", "first", "last"),
     [
-        ({"sort": "name"}, "10.example.com. PTR", "www.example.com. AAAA"),
-        ({"sort": "name", "order": "desc"}, "www.example.com. A", "10.example.com. PTR"),
+        ({"sort": "name"}, "example.com. CAA", "www.example.com. AAAA"),
+        ({"sort": "name", "order": "desc"}, "www.example.com. A", "example.com. TXT"),
         ({"sort": "type"}, "www.example.com. A", "example.com. TXT"),
         ({"sort": "ttl", "order": "desc"}, "example.com. NS", "www.example.com. AAAA"),
     ],

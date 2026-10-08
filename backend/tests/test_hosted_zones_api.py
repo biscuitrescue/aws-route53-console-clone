@@ -75,6 +75,13 @@ def test_invalid_domain_names_are_rejected(client: TestClient, name: str) -> Non
     assert body["details"] == [{"field": "name", "message": body["message"]}]
 
 
+def test_invalid_domain_name_uses_route53_wording(client: TestClient) -> None:
+    response = client.post(ZONES, json={"name": "bad..name"})
+    assert response.json()["message"] == (
+        "DomainLabelEmpty (Domain label is empty) encountered with 'bad..name'"
+    )
+
+
 def test_empty_name_fails_request_validation(client: TestClient) -> None:
     response = client.post(ZONES, json={"name": ""})
     assert response.status_code == 422
@@ -147,6 +154,7 @@ def test_zones_of_another_user_are_invisible(client: TestClient, db: Session) ->
             id="ZOTHERUSER0000000000A",
             owner_id=other.id,
             name="private-to-other.com.",
+            sort_key="com.private-to-other",
             type="public",
             caller_reference="other-ref",
         )
@@ -222,15 +230,16 @@ def several_zones(client: TestClient) -> list[dict[str, Any]]:
     return zones
 
 
-def test_list_is_sorted_by_name_by_default(
+def test_list_is_sorted_by_domain_by_default(
     client: TestClient, several_zones: list[dict[str, Any]]
 ) -> None:
     body = client.get(ZONES).json()
+    # Ordered by domain from the right, as Route 53 lists them: com, internal, net, org.
     assert [zone["name"] for zone in body["items"]] == [
         "alpha.com.",
+        "gamma.internal.",
         "beta-shop.net.",
         "delta.org.",
-        "gamma.internal.",
     ]
     assert (body["total"], body["page"], body["page_size"], body["pages"]) == (4, 1, 50, 1)
     assert "name_servers" not in body["items"][0]
@@ -257,6 +266,9 @@ def test_list_is_sorted_by_name_by_default(
         ({"filter": "type:eq:Private"}, ["gamma.internal."]),
         ({"filter": "record_count:gt:2"}, ["beta-shop.net."]),
         ({"filter": "record_count:eq:2"}, ["alpha.com.", "delta.org.", "gamma.internal."]),
+        ({"filter": "any:contains:SHOP"}, ["beta-shop.net.", "delta.org."]),
+        ({"filter": ["any:contains:shop", "any:contains:beta"]}, ["beta-shop.net."]),
+        ({"filter": "any:not_contains:shop"}, ["alpha.com.", "gamma.internal."]),
         ({"filter": ["type:eq:public", "description:contains:shop"]}, ["delta.org."]),
         (
             {"filter": ["name:starts_with:alpha", "name:starts_with:gamma"], "filter_mode": "or"},
@@ -270,7 +282,7 @@ def test_search_and_filters(
     params: dict[str, Any],
     expected: list[str],
 ) -> None:
-    assert _names(client, **params) == expected
+    assert sorted(_names(client, **params)) == sorted(expected)
 
 
 def test_filter_by_id(client: TestClient, several_zones: list[dict[str, Any]]) -> None:
@@ -282,7 +294,7 @@ def test_filter_by_id(client: TestClient, several_zones: list[dict[str, Any]]) -
 @pytest.mark.parametrize(
     ("params", "expected"),
     [
-        ({"sort": "name", "order": "desc"}, ["gamma", "delta", "beta-shop", "alpha"]),
+        ({"sort": "name", "order": "desc"}, ["delta", "beta-shop", "gamma", "alpha"]),
         ({"sort": "record_count", "order": "desc"}, ["beta-shop", "alpha", "gamma", "delta"]),
         ({"sort": "type"}, ["gamma", "alpha", "beta-shop", "delta"]),
         ({"sort": "description"}, ["gamma", "alpha", "delta", "beta-shop"]),
@@ -305,10 +317,10 @@ def test_pagination(client: TestClient, several_zones: list[dict[str, Any]]) -> 
 
     assert [zone["name"] for zone in first["items"]] == [
         "alpha.com.",
+        "gamma.internal.",
         "beta-shop.net.",
-        "delta.org.",
     ]
-    assert [zone["name"] for zone in second["items"]] == ["gamma.internal."]
+    assert [zone["name"] for zone in second["items"]] == ["delta.org."]
     assert (first["total"], first["pages"]) == (4, 2)
     assert (beyond["items"], beyond["total"], beyond["pages"]) == ([], 4, 2)
 
@@ -321,6 +333,7 @@ def test_pagination(client: TestClient, several_zones: list[dict[str, Any]]) -> 
         ({"filter": "colour:eq:red"}, 400, "Cannot filter by 'colour'"),
         ({"filter": "record_count:gt:many"}, 400, "must be a whole number"),
         ({"filter": "name:gt:a"}, 400, "cannot be used on a text property"),
+        ({"filter": "any:eq:a"}, 400, "Free-text filters support only contains"),
         ({"sort": "colour"}, 400, "Cannot sort by 'colour'"),
         ({"page": 0}, 422, "The request is not valid."),
         ({"page_size": 501}, 422, "The request is not valid."),

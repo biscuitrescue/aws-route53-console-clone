@@ -18,6 +18,7 @@ class HostedZone(Base):
     id: Mapped[str] = mapped_column(String(32), primary_key=True)
     owner_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
     name: Mapped[str] = mapped_column(String(255), index=True)
+    sort_key: Mapped[str] = mapped_column(String(255))
     type: Mapped[str] = mapped_column(String(16))
     description: Mapped[str] = mapped_column(String(256), default="")
     caller_reference: Mapped[str] = mapped_column(String(128), unique=True)

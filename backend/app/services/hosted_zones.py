@@ -6,7 +6,7 @@ from collections.abc import Sequence
 from sqlalchemy.orm import Session
 
 from app.domain.aws_regions import AWS_REGIONS
-from app.domain.dns_names import DnsNameError, normalize_zone_name
+from app.domain.dns_names import DnsNameError, normalize_zone_name, sort_key
 from app.domain.enums import RecordType, ZoneType
 from app.domain.identifiers import (
     APEX_NS_TTL,
@@ -117,6 +117,7 @@ def create_zone(db: Session, user: User, payload: HostedZoneCreate) -> ZoneRow:
         id=new_hosted_zone_id(),
         owner_id=user.id,
         name=name,
+        sort_key=sort_key(name),
         type=payload.type.value,
         description=payload.description.strip(),
         caller_reference=new_caller_reference(),

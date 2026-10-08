@@ -7,6 +7,7 @@ from sqlalchemy import ColumnElement, SQLColumnExpression, and_, exists, func, n
 from sqlalchemy.orm import Session
 
 from app.domain.enums import RecordType
+from app.errors import InvalidInputError
 from app.models import RecordSet, RecordValue
 from app.repositories.filtering import (
     LIKE_ESCAPE,
@@ -54,7 +55,19 @@ def _alias_condition(operator: FilterOperator, value: str) -> ColumnElement[bool
     return not_(matches) if operator is FilterOperator.NE else matches
 
 
+def _any_condition(operator: FilterOperator, value: str) -> ColumnElement[bool]:
+    """Free text: match the record name or any of its values."""
+    if operator not in (FilterOperator.CONTAINS, FilterOperator.NOT_CONTAINS):
+        raise InvalidInputError("Free-text filters support only contains", field="filter")
+    matches = or_(
+        RecordSet.name.ilike(contains_pattern(value), escape=LIKE_ESCAPE),
+        _value_condition(FilterOperator.CONTAINS, value),
+    )
+    return not_(matches) if operator is FilterOperator.NOT_CONTAINS else matches
+
+
 _FILTER_FIELDS: dict[str, Condition] = {
+    "any": _any_condition,
     "name": fqdn_condition(RecordSet.name),
     "type": text_condition(RecordSet.type),
     "value": _value_condition,
@@ -62,12 +75,13 @@ _FILTER_FIELDS: dict[str, Condition] = {
     "routing_policy": text_condition(RecordSet.routing_policy),
     "set_identifier": text_condition(RecordSet.set_identifier),
     "alias": _alias_condition,
+    "health_check_id": text_condition(func.coalesce(RecordSet.health_check_id, "")),
     "id": text_condition(RecordSet.id),
 }
 
 _SORT_FIELDS: dict[str, SQLColumnExpression[Any]] = {
     "default": RecordSet.sort_key,
-    "name": RecordSet.name,
+    "name": RecordSet.sort_key,
     "type": RecordSet.type,
     "ttl": RecordSet.ttl,
     "routing_policy": RecordSet.routing_policy,
@@ -92,12 +106,7 @@ def list_records(
 ) -> tuple[list[RecordSet], int]:
     statement = select(RecordSet).where(RecordSet.zone_id == zone_id)
     if search:
-        statement = statement.where(
-            or_(
-                RecordSet.name.ilike(contains_pattern(search), escape=LIKE_ESCAPE),
-                _value_condition(FilterOperator.CONTAINS, search),
-            )
-        )
+        statement = statement.where(_any_condition(FilterOperator.CONTAINS, search))
     if types:
         statement = statement.where(
             RecordSet.type.in_([record_type.value for record_type in types])
