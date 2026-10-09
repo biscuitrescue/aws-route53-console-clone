@@ -409,29 +409,31 @@ export function RecordsTable({ zone, selected, onSelectionChange, onDelete }: Re
         </Header>
       }
       filter={
-        <div className={styles.filters}>
-          <div className={styles.propertyFilter} ref={filterContainer}>
-            <PropertyFilter
-              ref={filterRef}
-              query={query}
-              onChange={({ detail }) => changeQuery(detail)}
-              filteringProperties={FILTERING_PROPERTIES}
-              filteringOptions={FILTERING_OPTIONS}
-              filteringPlaceholder="Filter records by property or value"
-              filteringAriaLabel="Filter records by property or value"
-              countText={filtering && records.data ? matchesText(total) : undefined}
-              expandToViewport
-            />
+        <div className={styles.filterRow}>
+          <div className={styles.filters}>
+            <div className={styles.propertyFilter} ref={filterContainer}>
+              <PropertyFilter
+                ref={filterRef}
+                query={query}
+                onChange={({ detail }) => changeQuery(detail)}
+                filteringProperties={FILTERING_PROPERTIES}
+                filteringOptions={FILTERING_OPTIONS}
+                filteringPlaceholder="Filter records by property or value"
+                filteringAriaLabel="Filter records by property or value"
+                countText={filtering && records.data ? matchesText(total) : undefined}
+                expandToViewport
+              />
+            </div>
+            {quickFilter("type", "Type", TYPE_OPTIONS)}
+            {quickFilter("routing_policy", "Routing policy", POLICY_OPTIONS)}
+            {quickFilter("alias", "Alias", ALIAS_OPTIONS)}
+            {/* The console repeats the match count after the selects. */}
+            {filtering && records.data && (
+              <span className={styles.count} aria-hidden="true">
+                {matchesText(total)}
+              </span>
+            )}
           </div>
-          {quickFilter("type", "Type", TYPE_OPTIONS)}
-          {quickFilter("routing_policy", "Routing policy", POLICY_OPTIONS)}
-          {quickFilter("alias", "Alias", ALIAS_OPTIONS)}
-          {/* The console repeats the match count after the selects. */}
-          {filtering && records.data && (
-            <span className={styles.count} aria-hidden="true">
-              {matchesText(total)}
-            </span>
-          )}
         </div>
       }
       pagination={

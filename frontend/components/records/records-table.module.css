@@ -1,12 +1,31 @@
-/* The console puts the Type, Routing policy and Alias selects on the filter's row. The
-   property filter gives way first when the row is narrow; widths are the console's, as is
-   the space it keeps free before the pagination. */
+/* The console puts the Type, Routing policy and Alias selects on the filter's row and
+   keeps them there as the row narrows: the property filter is what gives way, from the
+   console's 728 px down to its icon and a few characters (70 px). Widths are the
+   console's, as is the space it keeps free before the pagination.
+
+   --row-minimum is the row with the filter at its narrowest: 70 + 79 + 131 + 82 and
+   three gaps of 10. Only a container narrower than that, a phone, wraps the selects. */
+.filterRow {
+  --row-minimum: 392px;
+  container-type: inline-size;
+  /* Size containment hides the row's width from the table's toolbar, which moves the
+     pagination to its own line when the filter needs the room; this states it again. */
+  min-inline-size: min(100%, calc(var(--row-minimum) + 27px));
+}
+
 .filters {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   align-items: flex-start;
   gap: 10px;
   padding-inline-end: 27px;
+}
+
+@container (max-width: 391px) {
+  .filters {
+    flex-wrap: wrap;
+    padding-inline-end: 0;
+  }
 }
 
 .propertyFilter {

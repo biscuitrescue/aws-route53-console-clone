@@ -340,3 +340,74 @@ test("a private zone keeps its VPCs and tags, and both can be edited", async ({ 
   await removeZone(page, zone);
   expect(problems).toEqual([]);
 });
+
+test("the records filter and its selects share one row as the page narrows", async ({ page }) => {
+  await signIn(page);
+  const zone = await createZone(page, "toolbar");
+  const controls = () => [
+    page.getByPlaceholder("Filter records by property or value"),
+    page.getByRole("button", { name: "Filter by type" }),
+    page.getByRole("button", { name: "Filter by routing policy" }),
+    page.getByRole("button", { name: "Filter by alias" }),
+  ];
+
+  /** Open or close the side navigation, whatever state the page chose for this width. */
+  const setNavigation = async (open: boolean) => {
+    const isOpen = await page.getByRole("link", { name: "Health checks" }).isVisible();
+    if (isOpen !== open) {
+      await page
+        .locator('button[aria-label*="navigation" i]')
+        .filter({ visible: true })
+        .first()
+        .click();
+      await expect(page.getByRole("link", { name: "Health checks" })).toBeVisible({
+        visible: open,
+      });
+    }
+  };
+
+  // The states of the console's own captures. At 1920 px the navigation and the record
+  // panel are both open, which is the narrowest the content gets on a desktop.
+  const states = [
+    { width: 1920, navigation: true },
+    { width: 1300, navigation: false },
+    { width: 950, navigation: false },
+    { width: 800, navigation: true },
+  ];
+  for (const { width, navigation } of states) {
+    await page.setViewportSize({ width, height: 1080 });
+    await page.goto(`/route53/v2/hostedzones/${zone.id}`);
+    await expect(page.getByRole("gridcell", { name: "SOA", exact: true })).toBeVisible();
+    await setNavigation(navigation);
+
+    const boxes = [];
+    for (const control of controls()) {
+      await expect(control).toBeVisible();
+      boxes.push((await control.boundingBox())!);
+    }
+    const centres = boxes.map((box) => box.y + box.height / 2);
+    expect(Math.max(...centres) - Math.min(...centres), `one row at ${width} px`).toBeLessThan(4);
+    // Left to right in the console's order, none overlapping the next.
+    for (let index = 1; index < boxes.length; index++) {
+      expect(boxes[index].x, `order at ${width} px`).toBeGreaterThanOrEqual(
+        boxes[index - 1].x + boxes[index - 1].width,
+      );
+    }
+    // Nothing is pushed off the page.
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= document.documentElement.clientWidth,
+      ),
+      `no horizontal page scroll at ${width} px`,
+    ).toBe(true);
+  }
+
+  // With room to spare the filter keeps the console's 648 px field.
+  await page.setViewportSize({ width: 1920, height: 1080 });
+  await setNavigation(false);
+  await expect
+    .poll(async () => Math.round((await controls()[0].boundingBox())!.width))
+    .toBeGreaterThan(600);
+
+  await removeZone(page, zone);
+});

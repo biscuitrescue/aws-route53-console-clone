@@ -162,7 +162,10 @@ active link (S04, S44–S47 show the real pages those replace).
 - **Records table** (S26): header `Records (n)` + Info, or `(k/n)` with a selection;
   actions refresh, Delete record ("Delete records" with several selected, S27), Import
   zone file, Create record (primary). Filter line as in section 1; on the filter's row,
-  right after it, three selects: Type, Routing policy, Alias (S24). With a filter applied
+  right after it, three selects: Type, Routing policy, Alias (S24). The four stay on one
+  row at every captured width: the filter gives way from 728 px down to its icon and a
+  few characters, and only the pagination moves to a line of its own (S27 at 1920 px,
+  S53 at 1300, 950, 800 and 688 px). With a filter applied
   the match count is shown after the filter and again after the selects (S28). The header
   counter stays the number of records in the zone. Columns: Record name, Type, Routing policy, Differentiator, Alias,
   Value/Route traffic to (one value per line), TTL (seconds) (thousands separator), Health
@@ -285,7 +288,7 @@ type.", tiles Root user / IAM user, Email address, Next (orange, full width), di
 Dark is Cloudscape's dark mode (`#161d26` surfaces, `#c6c6cd` text); primary buttons stay
 orange. At 800 px the header's search folds into a button and the account button shows
 only the user; the footer takes two rows; page actions wrap under the title; the side split
-panel moves to the bottom; the record filter shrinks before its selects wrap; the table
+panel moves to the bottom; the record filter shrinks and its selects stay beside it; the table
 scrolls horizontally with the sticky scrollbar (S52, S53).
 
 ## 13. Deliberate differences from the real console

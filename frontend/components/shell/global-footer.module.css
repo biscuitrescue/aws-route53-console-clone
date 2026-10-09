@@ -72,4 +72,9 @@
   .optional {
     display: none;
   }
+
+  /* The copyright line is longer than a phone is wide. */
+  .copyright {
+    white-space: normal;
+  }
 }

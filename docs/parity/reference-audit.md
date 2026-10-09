@@ -82,7 +82,13 @@ Found by comparing, then fixed:
 - **Errors.** Detail line of the red flash at the console's size (S19, S23); errors leave
   the stack once a later action succeeds (S20).
 - **Narrow layout.** Search folds into a button, the account button shows one line, the
-  record filter shrinks before its selects wrap (S52, S53).
+  record filter shrinks and its selects stay on its row (S52, S53). A later pass found
+  that the row still wrapped whenever the content was narrower than at 1920 px with the
+  navigation closed, including at 1920 px with the navigation open: a flex row wraps as
+  soon as its items' bases do not fit, before any of them shrinks. The row no longer
+  wraps above 392 px of width (the filter at 70 px plus the three selects); an end-to-end
+  test measures it in the states of S27 and S53. Below that, on a phone, the selects go to
+  a second row; the console was not captured that narrow.
 
 Left different on purpose, with the reason, in [ui-spec.md §13](../ui-spec.md#13-deliberate-differences-from-the-real-console).
 

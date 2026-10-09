@@ -617,3 +617,22 @@
     max-inline-size: none;
   }
 }
+
+/* On a phone the user's name is cut short instead of pushing the bar past the screen. */
+@media (max-width: 560px) {
+  .menuAnchor:has(> .accountButton) {
+    flex: 0 1 auto;
+    min-inline-size: 0;
+  }
+
+  .accountButton {
+    max-inline-size: 100%;
+    padding-inline-end: 12px;
+  }
+
+  .accountButton > span {
+    max-inline-size: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+}
