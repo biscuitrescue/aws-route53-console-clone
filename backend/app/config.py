@@ -33,9 +33,28 @@ class Settings(BaseSettings):
     # Let the sign-in page show the demo credentials. Turn off for a private deployment.
     demo_credentials_public: bool = True
 
+    # Give every visitor who signs in to the demo account a private copy of its data,
+    # remembered by a cookie, instead of one shared set of zones.
+    demo_sandbox: bool = True
+    sandbox_cookie_name: str = "r53_sandbox"
+    # A sandbox nobody has used for this long is deleted, as is the oldest one when
+    # there are more than sandbox_max.
+    sandbox_idle_days: int = 14
+    sandbox_max: int = 500
+    # New sandboxes one client address may start per hour. Zero turns the limit off.
+    sandbox_creations_per_hour: int = 60
+
+    # Route 53's own default quotas. Zero turns a limit off.
+    max_hosted_zones: int = 500
+    max_records_per_zone: int = 10_000
+
     @property
     def session_ttl_seconds(self) -> int:
         return self.session_ttl_hours * 3600
+
+    @property
+    def sandbox_ttl_seconds(self) -> int:
+        return self.sandbox_idle_days * 86_400
 
 
 @lru_cache

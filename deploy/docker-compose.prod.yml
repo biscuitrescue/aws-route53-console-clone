@@ -43,6 +43,11 @@ services:
       R53_DATABASE_URL: sqlite:////data/route53.db
       R53_DEMO_EMAIL: ${DEMO_EMAIL:-demo@example.com}
       R53_DEMO_PASSWORD: ${DEMO_PASSWORD:?set DEMO_PASSWORD for the demo account}
+      # Every visitor gets a private copy of the sample zones. The quotas are far below
+      # Route 53's so that no one sandbox can fill the VM's disk.
+      R53_DEMO_SANDBOX: "true"
+      R53_MAX_HOSTED_ZONES: "50"
+      R53_MAX_RECORDS_PER_ZONE: "1000"
     volumes:
       # The live database sits on the VM's persistent disk, never in the container.
       - ${DATA_DIR:-/srv/route53/data}:/data

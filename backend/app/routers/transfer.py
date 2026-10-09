@@ -4,7 +4,7 @@ from typing import Annotated
 from fastapi import APIRouter, Query
 from fastapi.responses import JSONResponse, PlainTextResponse, Response
 
-from app.dependencies import CurrentZone, CurrentZoneRow, DbSession
+from app.dependencies import CurrentZone, CurrentZoneRow, DbSession, SettingsDep
 from app.routers.responses import BAD_REQUEST, UNAUTHORIZED, ZONE_NOT_FOUND
 from app.schemas.transfer import ExportFormat, ZoneFileImportRequest, ZoneFileImportResult
 from app.services import zone_transfer
@@ -62,6 +62,8 @@ def export_zone(
     responses=BAD_REQUEST,
 )
 def import_zone_file(
-    payload: ZoneFileImportRequest, db: DbSession, zone: CurrentZone
+    payload: ZoneFileImportRequest, db: DbSession, zone: CurrentZone, settings: SettingsDep
 ) -> ZoneFileImportResult:
-    return zone_transfer.import_zone_file(db, zone, payload)
+    return zone_transfer.import_zone_file(
+        db, zone, payload, max_records=settings.max_records_per_zone
+    )

@@ -12,7 +12,7 @@ from app.db import create_db_engine, create_session_factory
 from app.error_handlers import register_error_handlers
 from app.middleware import SameOriginMiddleware
 from app.routers import auth, health, hosted_zones, records, transfer
-from app.services.throttle import LoginThrottle
+from app.services.throttle import LoginThrottle, SlidingWindowCounter
 
 API_PREFIX = "/api/v1"
 DOCS_URL = "/api/docs"
@@ -57,6 +57,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         max_failures=settings.login_max_failures,
         max_failures_per_client=settings.login_max_failures_per_client,
         window=settings.login_failure_window_seconds,
+    )
+    app.state.sandbox_creations = SlidingWindowCounter(
+        settings.sandbox_creations_per_hour, window=3600
     )
     register_error_handlers(app)
     app.add_middleware(SameOriginMiddleware, trusted_origins=settings.trusted_origins)

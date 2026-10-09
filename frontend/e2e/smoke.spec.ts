@@ -164,3 +164,59 @@ test("placeholder sections show Coming soon inside the console frame", async ({ 
     await expect(page.getByRole("navigation", { name: "Breadcrumbs" })).toContainText(title);
   }
 });
+
+test("each visitor works in a private sandbox", async ({ browser }) => {
+  const mine = await browser.newContext();
+  const theirs = await browser.newContext();
+  const myPage = await mine.newPage();
+  const theirPage = await theirs.newPage();
+  for (const page of [myPage, theirPage]) {
+    await page.goto("/signin");
+    await signIn(page);
+  }
+  const accountId = async (page: Page) =>
+    (await (await page.request.get("/api/v1/auth/me")).json()).user.account_id as string;
+  test.skip(
+    (await accountId(myPage)) === (await accountId(theirPage)),
+    "This deployment shares one account between visitors (R53_DEMO_SANDBOX is off).",
+  );
+
+  // Both start from the same sample zones.
+  const sample = "example.org";
+  const link = (page: Page, name: string) => page.getByRole("link", { name, exact: true });
+  await expect(link(myPage, sample)).toBeVisible();
+  await expect(link(theirPage, sample)).toBeVisible();
+
+  // I delete a sample zone and create one of my own.
+  await myPage.getByTitle(`${sample} is not selected`, { exact: true }).click();
+  await myPage.getByRole("button", { name: "Delete", exact: true }).click();
+  await myPage.getByPlaceholder("delete").fill("delete");
+  await myPage.getByRole("dialog").getByRole("button", { name: "Delete" }).click();
+  await expect(flash(myPage)).toContainText(`Hosted zone ${sample} was successfully deleted.`);
+  const created = await myPage.request.post("/api/v1/hostedzones", {
+    data: { name: `private-${ZONE}` },
+  });
+  expect(created.status()).toBe(201);
+  const zoneId = (await created.json()).id as string;
+  await myPage.reload();
+  await expect(link(myPage, `private-${ZONE}`)).toBeVisible();
+  await expect(link(myPage, sample)).toHaveCount(0);
+
+  // The other visitor sees neither change, in the list or by asking for the zone directly.
+  await theirPage.reload();
+  await expect(link(theirPage, sample)).toBeVisible();
+  await expect(link(theirPage, `private-${ZONE}`)).toHaveCount(0);
+  expect((await theirPage.request.get(`/api/v1/hostedzones/${zoneId}`)).status()).toBe(404);
+  expect((await theirPage.request.delete(`/api/v1/hostedzones/${zoneId}`)).status()).toBe(404);
+
+  // Signing out and in again in the same browser returns to my sandbox.
+  await myPage.getByRole("button", { name: /^Account menu/ }).click();
+  await myPage.getByRole("menuitem", { name: /^Sign out/ }).click();
+  await expect(myPage).toHaveURL(/\/signin/);
+  await signIn(myPage);
+  await expect(link(myPage, `private-${ZONE}`)).toBeVisible();
+  await expect(link(myPage, sample)).toHaveCount(0);
+
+  await mine.close();
+  await theirs.close();
+});

@@ -28,6 +28,8 @@ def make_settings(database: Path, **overrides: Any) -> Settings:
         "database_url": f"sqlite:///{database}",
         "demo_password": PASSWORD,
         "seed_demo_data": False,
+        # Most tests exercise one account directly; test_sandbox.py turns sandboxes on.
+        "demo_sandbox": False,
     }
     return Settings(**(values | overrides))
 

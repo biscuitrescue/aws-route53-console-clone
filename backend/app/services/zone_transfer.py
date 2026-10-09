@@ -20,7 +20,7 @@ from app.schemas.transfer import (
     ZoneFileImportResult,
 )
 from app.services.change_batch import apply_change_batch
-from app.services.record_rules import describe
+from app.services.record_rules import describe, quota_message
 
 _APEX_MANAGED_TYPES = frozenset({RecordType.SOA, RecordType.NS})
 
@@ -118,7 +118,7 @@ def export_json(db: Session, row: ZoneRow) -> dict[str, Any]:
 
 
 def import_zone_file(
-    db: Session, zone: HostedZone, request: ZoneFileImportRequest
+    db: Session, zone: HostedZone, request: ZoneFileImportRequest, *, max_records: int = 0
 ) -> ZoneFileImportResult:
     """Preview or apply a BIND zone file.
 
@@ -186,6 +186,9 @@ def import_zone_file(
     for entry in entries:
         setattr(summary, entry.status, getattr(summary, entry.status) + 1)
     syntax_errors = [ErrorDetail(line=issue.line, message=issue.message) for issue in parsed.issues]
+    # Counted with the file's records applied, before the preview is rolled back.
+    if max_records and record_repository.count_records(db, zone.id) > max_records:
+        syntax_errors.append(ErrorDetail(message=quota_message(max_records)))
     has_errors = bool(syntax_errors) or summary.error > 0
     importable = summary.create + summary.replace
 

@@ -47,6 +47,7 @@ like and how the clone was compared with it is written down in
 - [Architecture](#architecture)
 - [Database schema](#database-schema)
 - [API overview](#api-overview)
+- [Visitor sandboxes](#visitor-sandboxes)
 - [Security](#security)
 - [Deployment on Google Cloud](#deployment-on-google-cloud)
 - [Known limitations](#known-limitations)
@@ -55,7 +56,7 @@ like and how the clone was compared with it is written down in
 
 | Assignment scope | What is implemented |
 |---|---|
-| Authentication | Mocked sign-in against a seeded demo account. Opaque session token in an httpOnly cookie, stored hashed, 14-day expiry, survives reloads, browser restarts and server restarts. A route guard sends visitors without a session to sign-in and back to where they were going. |
+| Authentication | Mocked sign-in against a seeded demo account. Opaque session token in an httpOnly cookie, stored hashed, 14-day expiry, survives reloads, browser restarts and server restarts. A route guard sends visitors without a session to sign-in and back to where they were going. Every visitor works in a [private sandbox](#visitor-sandboxes), so nothing one visitor deletes is missing for the next. |
 | Hosted zones | List with property filter, sorting, pagination and preferences; details side panel; create (public or private with VPC associations, tags); edit description, tags and VPC associations in one atomic save; delete with typed confirmation and Route 53's "zone must be empty" rule. |
 | DNS records | A, AAAA, CNAME, TXT, MX, NS, PTR, SRV, CAA (plus the zone's SOA). Table with free-text and property filters, type / routing policy / alias quick filters, sorting, pagination, preferences; quick create for several records at once, or the two-step wizard (routing policy, then records); edit in the side panel; delete with a confirmation listing the records. Simple, weighted, latency, failover, geolocation and multivalue routing, and alias records. |
 | Route 53 experience | The console's frame: global header (services menu, search with live results, CloudShell, notifications, help menu, account menu with Sign out), toolbar with breadcrumbs, side navigation, stacked flash notifications including the in-progress ones, help panel behind every "Info" link, side split panel, footer. Tables, forms, modals, empty and no-match states use the console's wording. Controls that belong to other AWS services say so instead of doing nothing. |
@@ -150,7 +151,10 @@ Every variable is optional. Copy `backend/.env.example` to `backend/.env` and
 | `R53_LOGIN_FAILURE_WINDOW_SECONDS` | `300` | Length of that window |
 | `R53_TRUSTED_ORIGINS` | `[]` | JSON list of other origins allowed to send state-changing requests; needed only if the frontend is served from a different host than the API |
 | `R53_DEMO_EMAIL`, `R53_DEMO_PASSWORD`, `R53_DEMO_DISPLAY_NAME`, `R53_DEMO_ACCOUNT_ID` | see `.env.example` | The seeded demo account |
-| `R53_SEED_DEMO_DATA` | `true` | Create the sample zones when the demo account has none |
+| `R53_SEED_DEMO_DATA` | `true` | Create the sample zones when they do not exist yet |
+| `R53_DEMO_SANDBOX` | `true` | Give each visitor of the demo account a private copy of the sample zones; see [Visitor sandboxes](#visitor-sandboxes) |
+| `R53_SANDBOX_IDLE_DAYS`, `R53_SANDBOX_MAX`, `R53_SANDBOX_CREATIONS_PER_HOUR` | `14`, `500`, `60` | When sandboxes are deleted, how many may exist, and how many one address may start per hour |
+| `R53_MAX_HOSTED_ZONES`, `R53_MAX_RECORDS_PER_ZONE` | `500`, `10000` | Quotas per account and per zone (Route 53's defaults); the live deployment sets 50 and 1000 |
 | `BACKEND_URL` (frontend) | `http://127.0.0.1:8000` | Where Next.js proxies `/api/*` (read at build or dev-server start) and where the sign-in page asks for the published credentials (read when the server runs) |
 
 ### Tests and checks
@@ -236,7 +240,7 @@ backend/
     repositories/      queries: search, property filters, sorting, pagination
     services/          business rules: auth, zones, records, change batches, import/export
     routers/           thin HTTP layer
-    seed.py            idempotent demo data
+    seed.py            idempotent demo data: the demo user and the template's sample zones
   alembic/             migrations
   tests/
 frontend/
@@ -319,6 +323,9 @@ erDiagram
         string display_name
         string account_id
         datetime created_at
+        string kind "account | template | sandbox"
+        string sandbox_key_hash UK "SHA-256 of the sandbox cookie"
+        datetime last_seen_at
     }
     sessions {
         string token_hash PK "SHA-256 of the cookie token"
@@ -382,7 +389,7 @@ erDiagram
 
 | Table | Purpose | Constraints and indexes |
 |---|---|---|
-| `users` | Mock accounts. | Unique `email`. |
+| `users` | Whoever owns hosted zones: the sign-in account, the template that holds the canonical sample zones, and one row per visitor sandbox. | Unique `email` and `sandbox_key_hash`. `kind` checked against the three kinds. Index `(kind, last_seen_at)` for finding idle sandboxes. `AUTOINCREMENT`, so a deleted sandbox's ID is never reused. |
 | `sessions` | Login sessions. | Primary key is the token's hash. Index on `expires_at` (purge) and `user_id`. Cascade on user delete. |
 | `hosted_zones` | Hosted zones. | `type` checked against `public`/`private`. Unique `caller_reference`. Indexes on `name` and `owner_id`. `name` is deliberately not unique, as in Route 53. |
 | `hosted_zone_vpcs` | VPCs of private zones. | Unique `(zone_id, vpc_id)`. Cascade on zone delete. |
@@ -403,6 +410,11 @@ Notes:
 - Every connection runs `PRAGMA foreign_keys=ON` and `PRAGMA journal_mode=WAL`.
 - The schema is created by Alembic (`backend/alembic/versions`); a test asserts that the
   migrations and the models never diverge.
+- SQLite alters a table by rebuilding it and dropping the old one, and with foreign keys
+  enforced that drop cascades into every row referring to the table. Migrations therefore
+  run with enforcement off and finish with `PRAGMA foreign_key_check`
+  (`backend/alembic/env.py`); a test migrates a populated database up and down and compares
+  every row.
 
 ## API overview
 
@@ -549,6 +561,44 @@ request `field`, the `index` of the failing change in a batch, or the zone file 
 | 422 | The request is malformed | `ValidationError` |
 | 429 | Too many failed sign-ins; `Retry-After` says how long to wait | `Throttling` |
 
+## Visitor sandboxes
+
+The live site has one account and its password is printed on the sign-in page, so every
+visitor used to edit the same hosted zones: anyone could delete the sample data and leave
+an empty console for the next person.
+
+Now signing in to that account opens a **sandbox**: a private copy of the sample zones
+that belongs to one browser.
+
+- **How a visitor gets one.** At sign-in the backend looks for the `r53_sandbox` cookie
+  (httpOnly, 14 days, stored as a SHA-256 like the session token). If it names a sandbox,
+  the session is opened on it, so signing out and in again returns to the same data. If
+  not, a sandbox is created and filled, in the same transaction as the session, with a
+  copy of the 12 sample zones and their records. Nothing has to be registered.
+- **Where the copies come from.** The sample zones belong to a *template* user that has no
+  usable password and no session, so it cannot be signed in to or edited. It is seeded
+  once, deterministically, from `backend/app/seed.py`. Because the canonical data can
+  never be changed, there is nothing to reset and no reset schedule.
+- **Isolation is the backend's ownership check.** A sandbox is a row of `users`, and every
+  zone query was already filtered by owner, so another visitor's zone ID answers
+  `NoSuchHostedZone` on every route: read, edit, delete, records, tags, import, export.
+  The frontend is not involved.
+- **Cleanup.** When a sandbox is created, sandboxes unused for 14 days are deleted, and so
+  are the stalest beyond 500. Their sessions, zones and records go with them through the
+  foreign keys. Using a sandbox keeps it alive.
+- **Limits.** One client address can start 60 sandboxes an hour. On the live site a
+  sandbox holds at most 50 hosted zones of 1,000 records each (`TooManyHostedZones`,
+  `LimitsExceeded`), enforced on single creates, change batches and zone file imports.
+
+Verified by `backend/tests/test_sandbox.py` (one visitor deletes everything they have and
+the other's zones are unchanged; thirteen requests against a foreign zone ID are refused;
+idle and surplus sandboxes are purged with all they own; the template never changes) and
+by an end-to-end test that drives two browsers side by side.
+
+What it does not do: a visitor who clears their cookies, or uses another browser, starts
+from a fresh copy and cannot get the old one back. `R53_DEMO_SANDBOX=false` restores one
+shared set of zones.
+
 ## Security
 
 Authentication is mocked, so this is not a claim of production security. What is in place:
@@ -691,6 +741,8 @@ Registry repository, the backup bucket and the service account.
   servers, alias targets, VPC IDs and health check IDs are not checked against real AWS
   resources.
 - Authentication is mocked: one seeded demo account, no IAM, MFA, sign-up or password reset.
+  Each browser that signs in to it gets its own sandbox; the sandbox is tied to a cookie,
+  not to a person.
 - Routing policies: simple, weighted, latency, failover, geolocation and multivalue answer
   are stored and validated. Geoproximity and IP-based routing are not implemented.
 - Record types are the nine in the assignment plus SOA; the console's other types (DS,

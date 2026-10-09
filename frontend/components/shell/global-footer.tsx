@@ -35,8 +35,10 @@ function AboutModal({ onDismiss }: { onDismiss: () => void }) {
         <div>
           <Box variant="h3">Privacy</Box>
           <Box variant="p">
-            The only account is shared. Hosted zones and records you create are visible to everyone
-            who signs in. Do not enter personal data or real credentials.
+            Everyone signs in to the same account, and each browser gets its own private copy of the
+            sample hosted zones. Other visitors cannot see or change what you create. A copy that
+            has not been used for 14 days is deleted. Do not enter personal data or real
+            credentials.
           </Box>
         </div>
         <div>
@@ -49,9 +51,10 @@ function AboutModal({ onDismiss }: { onDismiss: () => void }) {
         <div>
           <Box variant="h3">Cookie preferences</Box>
           <Box variant="p">
-            One essential cookie keeps you signed in; it cannot be read by scripts. Table, panel and
-            visual mode preferences are kept in this browser&apos;s local storage. There are no
-            analytics or advertising cookies, so there is nothing to opt out of.
+            Two essential cookies are set, and neither can be read by scripts: one keeps you signed
+            in, the other remembers which copy of the sample data is yours. Table, panel and visual
+            mode preferences are kept in this browser&apos;s local storage. There are no analytics
+            or advertising cookies, so there is nothing to opt out of.
           </Box>
         </div>
       </SpaceBetween>

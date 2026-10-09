@@ -19,6 +19,7 @@ from app.schemas.hosted_zone import HostedZoneCreate, Tag, VpcAssociation
 from app.schemas.record_set import AliasTarget, Change, RecordSetInput
 from app.services import hosted_zones as zone_service
 from app.services import records as record_service
+from app.services import sandbox as sandbox_service
 from app.services.auth import hash_password
 
 logger = logging.getLogger(__name__)
@@ -216,9 +217,16 @@ def seed_demo_zones(db: Session, user: User) -> int:
 
 
 def seed(db: Session, settings: Settings) -> None:
-    user = ensure_demo_user(db, settings)
+    """Make sure the demo user and the sample zones exist.
+
+    With sandboxes on, the zones belong to the template that every sandbox is copied
+    from; otherwise to the demo user itself.
+    """
+    owner = ensure_demo_user(db, settings)
+    if settings.demo_sandbox:
+        owner = sandbox_service.ensure_template(db)
     if settings.seed_demo_data:
-        created = seed_demo_zones(db, user)
+        created = seed_demo_zones(db, owner)
         logger.info("Seeded %d demo hosted zones", created)
 
 

@@ -81,6 +81,9 @@ def authenticate(db: Session, token: str | None) -> AuthSession:
         raise UnauthorizedError("Your session has expired. Sign in again.", code="SessionExpired")
     if now - session.last_seen_at >= _LAST_SEEN_RESOLUTION:
         session.last_seen_at = now
+        # Keeps a sandbox that is in use from being purged as idle.
+        if session.user.is_sandbox:
+            session.user.last_seen_at = now
         db.commit()
     return session
 

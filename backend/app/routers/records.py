@@ -2,7 +2,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Path, Query, status
 
-from app.dependencies import CurrentZone, DbSession
+from app.dependencies import CurrentZone, DbSession, SettingsDep
 from app.domain.enums import RecordType
 from app.models.base import utcnow
 from app.routers.responses import (
@@ -80,8 +80,13 @@ def list_records(
     summary="Create a record",
     responses={**BAD_REQUEST, **CONFLICT},
 )
-def create_record(payload: RecordSetInput, db: DbSession, zone: CurrentZone) -> RecordSetOut:
-    return RecordSetOut.from_model(record_service.create_record(db, zone, payload))
+def create_record(
+    payload: RecordSetInput, db: DbSession, zone: CurrentZone, settings: SettingsDep
+) -> RecordSetOut:
+    record = record_service.create_record(
+        db, zone, payload, max_records=settings.max_records_per_zone
+    )
+    return RecordSetOut.from_model(record)
 
 
 @router.post(
@@ -93,9 +98,11 @@ def create_record(payload: RecordSetInput, db: DbSession, zone: CurrentZone) -> 
     responses=BAD_REQUEST,
 )
 def change_records(
-    payload: ChangeBatchRequest, db: DbSession, zone: CurrentZone
+    payload: ChangeBatchRequest, db: DbSession, zone: CurrentZone, settings: SettingsDep
 ) -> ChangeBatchResult:
-    outcome = record_service.apply_batch(db, zone, payload.changes)
+    outcome = record_service.apply_batch(
+        db, zone, payload.changes, max_records=settings.max_records_per_zone
+    )
     return ChangeBatchResult(
         comment=payload.comment,
         submitted_at=utcnow(),

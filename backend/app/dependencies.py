@@ -11,7 +11,7 @@ from app.models import AuthSession, HostedZone, User
 from app.repositories.hosted_zones import ZoneRow
 from app.services import auth as auth_service
 from app.services import hosted_zones as zone_service
-from app.services.throttle import LoginThrottle
+from app.services.throttle import LoginThrottle, SlidingWindowCounter
 
 
 def get_settings(request: Request) -> Settings:
@@ -36,6 +36,14 @@ def get_login_throttle(request: Request) -> LoginThrottle:
 LoginThrottleDep = Annotated[LoginThrottle, Depends(get_login_throttle)]
 
 
+def get_sandbox_creations(request: Request) -> SlidingWindowCounter:
+    counter: SlidingWindowCounter = request.app.state.sandbox_creations
+    return counter
+
+
+SandboxCreations = Annotated[SlidingWindowCounter, Depends(get_sandbox_creations)]
+
+
 def get_client_address(request: Request) -> str:
     """The address the request came from.
 
@@ -55,6 +63,13 @@ def get_session_token(request: Request, settings: SettingsDep) -> str | None:
 
 
 SessionToken = Annotated[str | None, Depends(get_session_token)]
+
+
+def get_sandbox_token(request: Request, settings: SettingsDep) -> str | None:
+    return request.cookies.get(settings.sandbox_cookie_name)
+
+
+SandboxToken = Annotated[str | None, Depends(get_sandbox_token)]
 
 
 def get_auth_session(db: DbSession, token: SessionToken) -> AuthSession:

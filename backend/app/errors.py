@@ -49,6 +49,13 @@ class InvalidZoneFileError(AppError):
     code = "InvalidZoneFile"
 
 
+class LimitExceededError(AppError):
+    """A quota of the account or of one hosted zone would be exceeded."""
+
+    status_code = 400
+    code = "LimitsExceeded"
+
+
 class UnauthorizedError(AppError):
     status_code = 401
     code = "Unauthorized"

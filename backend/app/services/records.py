@@ -53,12 +53,16 @@ def get_record(db: Session, zone: HostedZone, record_id: str) -> RecordSet:
     return record
 
 
-def create_record(db: Session, zone: HostedZone, payload: RecordSetInput) -> RecordSet:
+def create_record(
+    db: Session, zone: HostedZone, payload: RecordSetInput, *, max_records: int = 0
+) -> RecordSet:
     draft = record_rules.draft_record(zone.name, payload)
     record_rules.check_conflicts(db, zone, draft)
     record = record_rules.build_record(zone.id, draft)
     db.add(record)
     record_rules.align_group_ttl(db, zone, draft, record.id)
+    db.flush()
+    record_rules.ensure_within_quota(db, zone, max_records)
     db.commit()
     return record
 
@@ -101,7 +105,10 @@ def delete_record(db: Session, zone: HostedZone, record_id: str) -> None:
     db.commit()
 
 
-def apply_batch(db: Session, zone: HostedZone, changes: Sequence[Change]) -> BatchOutcome:
+def apply_batch(
+    db: Session, zone: HostedZone, changes: Sequence[Change], *, max_records: int = 0
+) -> BatchOutcome:
     outcome = apply_change_batch(db, zone, changes)
+    record_rules.ensure_within_quota(db, zone, max_records)
     db.commit()
     return outcome

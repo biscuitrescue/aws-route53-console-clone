@@ -16,7 +16,7 @@ from app.domain.dns_names import (
 from app.domain.enums import FailoverRole, RecordType, RoutingPolicy
 from app.domain.identifiers import new_record_id
 from app.domain.record_validation import MAX_TTL, RecordValueError, validate_values
-from app.errors import AppError, ConflictError, InvalidInputError
+from app.errors import AppError, ConflictError, InvalidInputError, LimitExceededError
 from app.models import HostedZone, RecordSet
 from app.repositories import records as record_repository
 from app.schemas.record_set import RecordSetInput
@@ -277,6 +277,23 @@ def align_group_ttl(db: Session, zone: HostedZone, draft: RecordDraft, record_id
         in_group = sibling.type == draft.type and sibling.routing_policy == draft.routing_policy
         if in_group and sibling.id != record_id and not sibling.is_alias:
             sibling.ttl = draft.ttl
+
+
+def ensure_within_quota(db: Session, zone: HostedZone, max_records: int) -> None:
+    """Refuse changes that leave the zone with more records than its quota allows.
+
+    Called after the changes are flushed and before they are committed, so the count
+    includes them and raising discards them. Zero means no limit.
+    """
+    if max_records and record_repository.count_records(db, zone.id) > max_records:
+        raise LimitExceededError(quota_message(max_records))
+
+
+def quota_message(max_records: int) -> str:
+    return (
+        "This operation can't be completed because the hosted zone would exceed the "
+        f"limit of {max_records} records."
+    )
 
 
 def ensure_not_required(zone_name: str, record: RecordSet) -> None:

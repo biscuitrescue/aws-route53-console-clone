@@ -33,11 +33,26 @@ def run_migrations_offline() -> None:
 def run_migrations_online() -> None:
     engine = create_db_engine(_database_url())
     with engine.connect() as connection:
+        # A batch migration rebuilds a table and drops the old one. With foreign keys
+        # enforced, SQLite treats that drop as deleting every row and cascades it: altering
+        # `users` would delete every hosted zone. So enforcement is off while migrating,
+        # as SQLite's procedure for altering tables prescribes, and the result is checked.
+        connection.exec_driver_sql("PRAGMA foreign_keys=OFF")
+        if connection.exec_driver_sql("PRAGMA foreign_keys").scalar() != 0:
+            raise RuntimeError("Could not turn foreign key enforcement off for the migration")
+        # End the transaction these statements opened, so Alembic manages its own.
+        connection.commit()
+
         context.configure(
             connection=connection, target_metadata=target_metadata, render_as_batch=True
         )
         with context.begin_transaction():
             context.run_migrations()
+
+        violations = connection.exec_driver_sql("PRAGMA foreign_key_check").fetchall()
+        connection.rollback()
+        if violations:
+            raise RuntimeError(f"The migration left dangling references: {violations[:5]}")
     engine.dispose()
 
 

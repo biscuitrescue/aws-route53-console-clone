@@ -16,7 +16,13 @@ from app.domain.identifiers import (
     new_hosted_zone_id,
     soa_value,
 )
-from app.errors import ConflictError, InvalidDomainNameError, InvalidInputError, NotFoundError
+from app.errors import (
+    ConflictError,
+    InvalidDomainNameError,
+    InvalidInputError,
+    LimitExceededError,
+    NotFoundError,
+)
 from app.models import HostedZone, HostedZoneTag, HostedZoneVpc, User
 from app.models.base import utcnow
 from app.repositories import hosted_zones as zone_repository
@@ -107,8 +113,19 @@ def _validated_tags(tags: Sequence[Tag]) -> list[HostedZoneTag]:
     return [HostedZoneTag(key=tag.key, value=tag.value) for tag in tags]
 
 
-def create_zone(db: Session, user: User, payload: HostedZoneCreate) -> ZoneRow:
-    """Create a zone together with the apex SOA and NS record sets Route 53 provides."""
+def create_zone(
+    db: Session, user: User, payload: HostedZoneCreate, *, max_zones: int = 0
+) -> ZoneRow:
+    """Create a zone together with the apex SOA and NS record sets Route 53 provides.
+
+    ``max_zones`` is the account's quota of hosted zones; zero means no limit.
+    """
+    if max_zones and zone_repository.count_owned(db, user.id) >= max_zones:
+        raise LimitExceededError(
+            "This operation can't be completed because the current account has reached "
+            f"the limit of {max_zones} hosted zones.",
+            code="TooManyHostedZones",
+        )
     try:
         name = normalize_zone_name(payload.name)
     except DnsNameError as exc:

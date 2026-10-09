@@ -33,6 +33,8 @@ export interface paths {
         /**
          * Sign in and start a session
          * @description Repeated failures from one address are throttled: the answer is then 429 with a `Retry-After` header, whether or not the account exists.
+         *
+         *     With `R53_DEMO_SANDBOX` on, signing in to the demo account opens the caller's own sandbox, a private copy of the sample zones remembered by a second cookie.
          */
         post: operations["login"];
         delete?: never;

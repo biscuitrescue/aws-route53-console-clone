@@ -206,6 +206,10 @@ def list_at_name(db: Session, zone_id: str, name: str) -> list[RecordSet]:
     )
 
 
+def count_records(db: Session, zone_id: str) -> int:
+    return db.scalar(select(func.count(RecordSet.id)).where(RecordSet.zone_id == zone_id)) or 0
+
+
 def count_non_required(db: Session, zone_id: str, zone_name: str) -> int:
     """Record sets other than the apex SOA and NS that Route 53 creates with the zone."""
     required = and_(RecordSet.name == zone_name, RecordSet.type.in_(_REQUIRED_APEX_TYPES))

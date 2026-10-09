@@ -2,7 +2,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Query, status
 
-from app.dependencies import CurrentUser, CurrentZoneRow, DbSession, ZoneId
+from app.dependencies import CurrentUser, CurrentZoneRow, DbSession, SettingsDep, ZoneId
 from app.domain.enums import ZoneType
 from app.repositories.hosted_zones import ZoneRow
 from app.routers.responses import (
@@ -103,9 +103,9 @@ def list_hosted_zones(
     responses=BAD_REQUEST,
 )
 def create_hosted_zone(
-    payload: HostedZoneCreate, db: DbSession, user: CurrentUser
+    payload: HostedZoneCreate, db: DbSession, user: CurrentUser, settings: SettingsDep
 ) -> HostedZoneDetail:
-    return _detail(zone_service.create_zone(db, user, payload))
+    return _detail(zone_service.create_zone(db, user, payload, max_zones=settings.max_hosted_zones))
 
 
 @router.get("/{zone_id}", summary="Get a hosted zone", responses=ZONE_NOT_FOUND)
