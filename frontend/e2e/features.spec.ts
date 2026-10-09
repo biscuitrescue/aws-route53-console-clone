@@ -215,6 +215,8 @@ test("keyboard shortcuts and the global search", async ({ page }) => {
 });
 
 test("dark mode is chosen in the account menu and survives a reload", async ({ page }) => {
+  // Light is the default even when the browser prefers dark.
+  await page.emulateMedia({ colorScheme: "dark" });
   await signIn(page);
   await page.goto("/route53/v2/hostedzones");
   const body = page.locator("body");

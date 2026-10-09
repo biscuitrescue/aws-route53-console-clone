@@ -61,7 +61,7 @@ like and how the clone was compared with it is written down in
 | Bonus: import | BIND zone file import (paste or upload) with a live dry-run preview that reports syntax errors by line and rule violations per record, and an option to replace existing records. |
 | Bonus: export | "Export zone" on the zone page downloads a BIND zone file or JSON in the AWS CLI's `list-resource-record-sets` shape. |
 | Bonus: bulk operations | Multi-select delete and bulk TTL edit, both through atomic change batches (`CREATE` / `UPSERT` / `DELETE`) modelled on `ChangeResourceRecordSets`; quick create also submits its records as one batch. |
-| Bonus: dark mode | Visual mode (browser default, light, dark) in the account menu, as in the console, remembered across visits and applied before first paint. |
+| Bonus: dark mode | Visual mode (browser default, light, dark) in the account menu, as in the console. Light by default; the choice is remembered across visits and applied before first paint. |
 | Bonus: keyboard shortcuts | See below. |
 
 ## Keyboard shortcuts

@@ -8,11 +8,13 @@ import { usePersistedState } from "./use-persisted-state";
 export type VisualMode = "auto" | "light" | "dark";
 
 export const VISUAL_MODE_KEY = "visualMode";
+/** Light unless the visitor picks another mode in the account menu. */
+const DEFAULT_MODE: VisualMode = "light";
 const DARK_QUERY = "(prefers-color-scheme: dark)";
 
-/** The console's visual mode: follow the browser, or force light or dark. */
+/** The console's visual mode: light, dark, or following the browser. */
 export function useVisualMode() {
-  return usePersistedState<VisualMode>(VISUAL_MODE_KEY, "auto");
+  return usePersistedState<VisualMode>(VISUAL_MODE_KEY, DEFAULT_MODE);
 }
 
 /** Keeps Cloudscape's colour mode in step with the stored visual mode and the browser. */
@@ -35,4 +37,4 @@ export function useApplyVisualMode() {
  * Runs before the first paint so a dark-mode visitor never sees a light flash. It mirrors
  * `useApplyVisualMode` and must stay dependency-free: it is inlined into the document.
  */
-export const visualModeBootScript = `(function(){try{var m=JSON.parse(localStorage.getItem("r53clone.${VISUAL_MODE_KEY}")||'"auto"');if(m==="dark"||(m==="auto"&&matchMedia("${DARK_QUERY}").matches)){document.body.classList.add("awsui-dark-mode")}}catch(e){}})()`;
+export const visualModeBootScript = `(function(){try{var m=JSON.parse(localStorage.getItem("r53clone.${VISUAL_MODE_KEY}")||'"${DEFAULT_MODE}"');if(m==="dark"||(m==="auto"&&matchMedia("${DARK_QUERY}").matches)){document.body.classList.add("awsui-dark-mode")}}catch(e){}})()`;
