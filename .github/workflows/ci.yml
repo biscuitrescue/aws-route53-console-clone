@@ -1,0 +1,156 @@
+# Runs every check the README lists: backend tests, lint and types; frontend types, lint
+# and formatting; and the end-to-end tests against a production build of both services.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  # The versions the Docker images use (backend/Dockerfile, frontend/Dockerfile).
+  UV_VERSION: "0.12.23"
+  UV_PYTHON: "3.13"
+  NODE_VERSION: "22"
+
+jobs:
+  backend:
+    name: Backend (pytest, ruff, mypy)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: ${{ env.UV_VERSION }}
+          enable-cache: true
+          cache-dependency-glob: backend/uv.lock
+      - name: Install dependencies
+        run: uv sync --frozen
+      - name: Lint
+        run: uv run ruff check --output-format=github .
+      - name: Formatting
+        run: uv run ruff format --check .
+      - name: Types
+        run: uv run mypy
+      - name: Tests
+        run: uv run pytest --junitxml=test-results/pytest.xml
+      - name: Keep the test results
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-test-results
+          path: backend/test-results/
+          if-no-files-found: warn
+
+  frontend:
+    name: Frontend (types, lint, formatting)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund
+      - name: Types
+        run: npm run typecheck
+      - name: Lint
+        run: npm run lint
+      - name: Formatting
+        run: npm run format:check
+
+  e2e:
+    name: End to end (Playwright)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      # A throwaway database; nothing here needs a secret.
+      R53_ENVIRONMENT: test
+      R53_DATABASE_URL: sqlite:///${{ github.workspace }}/e2e-data/route53.db
+      BACKEND_URL: http://127.0.0.1:8000
+      E2E_BASE_URL: http://127.0.0.1:3000
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: ${{ env.UV_VERSION }}
+          enable-cache: true
+          cache-dependency-glob: backend/uv.lock
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install backend dependencies
+        working-directory: backend
+        run: uv sync --frozen --no-dev
+      - name: Migrate and seed the database
+        working-directory: backend
+        run: |
+          uv run --no-dev alembic upgrade head
+          uv run --no-dev python -m app.seed
+      - name: Start the backend
+        working-directory: backend
+        run: |
+          nohup uv run --no-dev uvicorn --factory app.main:create_app \
+            --host 127.0.0.1 --port 8000 > "$GITHUB_WORKSPACE/backend.log" 2>&1 &
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci --no-audit --no-fund
+      - name: Build the frontend
+        working-directory: frontend
+        run: npm run build
+      - name: Start the frontend
+        working-directory: frontend
+        run: nohup npm run start:standalone > "$GITHUB_WORKSPACE/frontend.log" 2>&1 &
+        env:
+          PORT: "3000"
+          HOSTNAME: 127.0.0.1
+
+      - name: Wait for both services
+        run: |
+          curl --fail --silent --show-error --retry 30 --retry-delay 2 --retry-connrefused \
+            http://127.0.0.1:8000/api/v1/health
+          # Through the Next.js proxy, so this also proves the two are wired together.
+          curl --fail --silent --show-error --retry 30 --retry-delay 2 --retry-connrefused \
+            http://127.0.0.1:3000/api/v1/health
+          curl --fail --silent --show-error --output /dev/null http://127.0.0.1:3000/signin
+
+      - name: Install the browser
+        working-directory: frontend
+        run: npx playwright install --with-deps chromium
+      - name: End-to-end tests
+        working-directory: frontend
+        run: npm run test:e2e
+
+      - name: Keep the report, traces and server logs
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-report
+          path: |
+            frontend/playwright-report/
+            frontend/test-results/
+            backend.log
+            frontend.log
+          if-no-files-found: warn

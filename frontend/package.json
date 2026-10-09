@@ -9,6 +9,7 @@
     "prebuild": "npm run generate:theme",
     "build": "next build",
     "start": "next start",
+    "start:standalone": "cp -r .next/static .next/standalone/.next/ && cp -r public .next/standalone/ && node .next/standalone/server.js",
     "lint": "eslint",
     "typecheck": "next typegen && tsc --noEmit",
     "format": "prettier --write .",

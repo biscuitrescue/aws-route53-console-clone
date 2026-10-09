@@ -1,5 +1,7 @@
 # Route 53 console clone
 
+[![CI](https://github.com/biscuitrescue/aws-route53-console-clone/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/biscuitrescue/aws-route53-console-clone/actions/workflows/ci.yml)
+
 A functional clone of the Amazon Route 53 console: hosted zones and DNS records with full
 create, read, update and delete, backed by a FastAPI service and a SQLite database. It
 recreates the console's workflows and rules; it does not serve DNS.
@@ -180,6 +182,26 @@ Each backend test runs against its own SQLite file created by the real Alembic m
 so the migration, the constraints and the queries are all exercised.
 
 After changing the API, regenerate the frontend's types with `npm run generate:api`.
+
+### Continuous integration
+
+[`.github/workflows/ci.yml`](.github/workflows/ci.yml) runs on every push to `main` and on
+every pull request, so the checks above do not have to be taken on trust. The badge at the
+top of this file links to the runs. It has three jobs:
+
+| Job | What it runs |
+|---|---|
+| Backend | `ruff check`, `ruff format --check`, `mypy` (strict) and the whole `pytest` suite, on the Python version of the production image |
+| Frontend | `npm run typecheck`, `npm run lint` and `npm run format:check` |
+| End to end | Migrates and seeds a throwaway SQLite database, starts the API, builds the frontend for production and starts it, waits for both to answer their health checks, then runs the Playwright tests in Chromium |
+
+No job needs a secret. Each uploads its results as artifacts: the JUnit report of the
+backend tests, and for the end-to-end job the Playwright HTML report, the trace and
+screenshot of any failed test, and both server logs. In CI a failed end-to-end test is
+retried once and reported as flaky if it then passes; a test that fails twice fails the run.
+
+`npm run start:standalone` is what the workflow uses to serve the production build; it
+works locally too, after `npm run build`.
 
 ## Architecture
 
