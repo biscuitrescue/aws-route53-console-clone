@@ -171,7 +171,7 @@ def test_zones_of_another_user_are_invisible(client: TestClient, db: Session) ->
     assert client.delete(f"{ZONES}/ZOTHERUSER0000000000A").status_code == 404
 
 
-def test_only_the_description_can_be_edited(client: TestClient, zone: dict[str, Any]) -> None:
+def test_the_name_and_type_cannot_be_edited(client: TestClient, zone: dict[str, Any]) -> None:
     response = client.patch(
         f"{ZONES}/{zone['id']}", json={"description": "Updated", "name": "other.com"}
     )
@@ -181,6 +181,64 @@ def test_only_the_description_can_be_edited(client: TestClient, zone: dict[str, 
     assert body["name"] == "example.com."
     assert body["updated_at"] >= zone["updated_at"]
     assert client.get(f"{ZONES}/{zone['id']}").json()["description"] == "Updated"
+
+
+def test_one_edit_changes_description_and_tags_together(
+    client: TestClient, zone: dict[str, Any]
+) -> None:
+    url = f"{ZONES}/{zone['id']}"
+    edited = client.patch(
+        url, json={"description": "Both", "tags": [{"key": "env", "value": "demo"}]}
+    )
+    assert edited.status_code == 200
+    assert (edited.json()["description"], edited.json()["tags"]) == (
+        "Both",
+        [{"key": "env", "value": "demo"}],
+    )
+
+    # Omitted fields keep their value.
+    assert client.patch(url, json={"tags": []}).json()["description"] == "Both"
+    assert client.patch(url, json={}).json()["tags"] == []
+
+
+def test_a_rejected_edit_changes_nothing(client: TestClient, zone: dict[str, Any]) -> None:
+    url = f"{ZONES}/{zone['id']}"
+    client.patch(url, json={"description": "Before", "tags": [{"key": "keep", "value": "me"}]})
+
+    duplicate = [{"key": "a", "value": "1"}, {"key": "a", "value": "2"}]
+    rejected = client.patch(url, json={"description": "After", "tags": duplicate})
+    assert rejected.status_code == 400
+    assert "more than once" in rejected.json()["message"]
+
+    unchanged = client.get(url).json()
+    assert unchanged["description"] == "Before"
+    assert unchanged["tags"] == [{"key": "keep", "value": "me"}]
+
+
+def test_vpc_associations_of_a_private_zone_can_be_edited(client: TestClient) -> None:
+    zone = create_zone(client, "corp.internal", type="private", vpcs=[VPC])
+    url = f"{ZONES}/{zone['id']}"
+    other = {"vpc_id": "vpc-11112222", "region": "eu-west-1"}
+
+    added = client.patch(url, json={"vpcs": [VPC, other]})
+    assert added.status_code == 200
+    assert added.json()["vpcs"] == [VPC, other]
+
+    moved = client.patch(url, json={"vpcs": [{**other, "region": "eu-west-2"}]})
+    assert moved.json()["vpcs"] == [{**other, "region": "eu-west-2"}]
+    assert client.get(url).json()["vpcs"] == moved.json()["vpcs"]
+
+    # A private zone keeps at least one VPC, and the usual VPC rules apply.
+    for vpcs in ([], [{"vpc_id": "not-a-vpc", "region": "us-east-1"}], [other, other]):
+        assert client.patch(url, json={"vpcs": vpcs}).status_code == 400
+    assert client.get(url).json()["vpcs"] == moved.json()["vpcs"]
+
+
+def test_a_public_zone_cannot_be_given_vpcs(client: TestClient, zone: dict[str, Any]) -> None:
+    response = client.patch(f"{ZONES}/{zone['id']}", json={"vpcs": [VPC]})
+    assert response.status_code == 400
+    assert response.json()["details"][0]["field"] == "vpcs"
+    assert client.patch(f"{ZONES}/{zone['id']}", json={"vpcs": []}).status_code == 200
 
 
 def test_description_is_limited_to_256_characters(client: TestClient, zone: dict[str, Any]) -> None:
@@ -290,6 +348,17 @@ def test_search_and_filters(
     assert sorted(_names(client, **params)) == sorted(expected)
 
 
+def test_accelerated_recovery_is_disabled_for_every_zone(client: TestClient) -> None:
+    create_zone(client, "example.com")
+    url = f"{API}/hostedzones"
+    assert (
+        client.get(url, params={"filter": "accelerated_recovery:contains:dis"}).json()["total"] == 1
+    )
+    assert (
+        client.get(url, params={"filter": "accelerated_recovery:eq:Enabled"}).json()["total"] == 0
+    )
+
+
 def test_filter_by_id(client: TestClient, several_zones: list[dict[str, Any]]) -> None:
     target = several_zones[2]
     assert _names(client, filter=f"id:eq:{target['id']}") == [target["name"]]
@@ -299,7 +368,10 @@ def test_filter_by_id(client: TestClient, several_zones: list[dict[str, Any]]) -
 @pytest.mark.parametrize(
     ("params", "expected"),
     [
-        ({"sort": "name", "order": "desc"}, ["delta", "beta-shop", "gamma", "alpha"]),
+        # Plain alphabetical, as when the console's column header is clicked.
+        ({"sort": "name"}, ["alpha", "beta-shop", "delta", "gamma"]),
+        ({"sort": "name", "order": "desc"}, ["gamma", "delta", "beta-shop", "alpha"]),
+        ({"sort": "default", "order": "desc"}, ["delta", "beta-shop", "gamma", "alpha"]),
         ({"sort": "record_count", "order": "desc"}, ["beta-shop", "alpha", "gamma", "delta"]),
         ({"sort": "type"}, ["gamma", "alpha", "beta-shop", "delta"]),
         ({"sort": "description"}, ["gamma", "alpha", "delta", "beta-shop"]),

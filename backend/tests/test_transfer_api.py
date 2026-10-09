@@ -297,3 +297,13 @@ def test_export_and_import_require_a_known_zone_and_format(
     assert client.get(f"{API}/hostedzones/Z404/export").status_code == 404
     assert client.post(f"{API}/hostedzones/Z404/import", json={"content": "x"}).status_code == 404
     assert client.get(_url(zone, "export"), params={"format": "yaml"}).status_code == 422
+
+
+def test_export_file_names_are_safe_for_any_zone_name(client: TestClient) -> None:
+    zone = create_zone(client, 'we"ird/na;me.example.com')
+    response = client.get(f"{API}/hostedzones/{zone['id']}/export", params={"format": "json"})
+    assert response.status_code == 200
+    assert (
+        response.headers["content-disposition"]
+        == 'attachment; filename="we_ird_na_me.example.com.json"'
+    )

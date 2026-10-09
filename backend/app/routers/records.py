@@ -51,7 +51,8 @@ def list_records(
         str,
         Query(
             description="default (Route 53 order), name, type, ttl, routing_policy, "
-            "set_identifier, alias or id"
+            "differentiator, set_identifier, alias, value, health_check_id, "
+            "evaluate_target_health or id"
         ),
     ] = "default",
     order: Order = "asc",

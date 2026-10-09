@@ -28,7 +28,13 @@ class HostedZoneCreate(BaseModel):
 
 
 class HostedZoneUpdate(BaseModel):
-    description: str = Field(max_length=256)
+    """Partial update; omitted fields keep their current value."""
+
+    description: str | None = Field(default=None, max_length=256)
+    tags: list[Tag] | None = Field(default=None, description="Replaces every tag of the zone")
+    vpcs: list[VpcAssociation] | None = Field(
+        default=None, description="Replaces the VPC associations of a private zone"
+    )
 
 
 class TagsUpdate(BaseModel):

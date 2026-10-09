@@ -71,8 +71,11 @@ def list_hosted_zones(
     filter_mode: FilterModeParam = "and",
     sort: Annotated[
         str,
-        Query(description="name, type, description, id, created_by, record_count or created_at"),
-    ] = "name",
+        Query(
+            description="default (Route 53 order), name, type, description, id, created_by, "
+            "record_count or created_at"
+        ),
+    ] = "default",
     order: Order = "asc",
     page: PageNumber = 1,
     page_size: PageSize = 50,
@@ -113,13 +116,15 @@ def get_hosted_zone(row: CurrentZoneRow) -> HostedZoneDetail:
 @router.patch(
     "/{zone_id}",
     summary="Edit a hosted zone",
-    description="Only the description can be changed after a zone is created.",
+    description="The description, the tags and, for a private zone, the VPC associations can "
+    "be changed after a zone is created. Omitted fields keep their value; the edit is "
+    "applied as a whole or not at all.",
     responses={**ZONE_NOT_FOUND, **BAD_REQUEST},
 )
 def update_hosted_zone(
     zone_id: ZoneId, payload: HostedZoneUpdate, db: DbSession, user: CurrentUser
 ) -> HostedZoneDetail:
-    return _detail(zone_service.update_zone(db, user, zone_id, payload.description))
+    return _detail(zone_service.update_zone(db, user, zone_id, payload))
 
 
 @router.delete(

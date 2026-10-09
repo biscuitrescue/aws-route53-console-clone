@@ -4,7 +4,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass, field
 from typing import Any
 
-from sqlalchemy import ColumnElement, SQLColumnExpression, func, not_, or_, select
+from sqlalchemy import ColumnElement, SQLColumnExpression, func, literal, not_, or_, select
 from sqlalchemy.orm import Session, selectinload
 
 from app.domain.enums import ZoneType
@@ -48,8 +48,12 @@ def _any_condition(operator: FilterOperator, value: str) -> ColumnElement[bool]:
     return not_(matches) if negated else matches
 
 
+# Accelerated recovery is not part of the clone, so it is off for every zone.
+ACCELERATED_RECOVERY = "Disabled"
+
 _FILTER_FIELDS: dict[str, Condition] = {
     "any": _any_condition,
+    "accelerated_recovery": text_condition(literal(ACCELERATED_RECOVERY)),
     "name": fqdn_condition(HostedZone.name),
     "type": text_condition(HostedZone.type),
     "description": text_condition(HostedZone.description),
@@ -58,9 +62,11 @@ _FILTER_FIELDS: dict[str, Condition] = {
     "record_count": number_condition(_RECORD_COUNT),
 }
 
-# Names sort the way Route 53 lists them: by domain, parent before child.
+# Unsorted, zones are listed the way Route 53 lists them: by domain, parent before child.
+# Sorting by name is plain alphabetical, as when the console's column header is clicked.
 _SORT_FIELDS: dict[str, SQLColumnExpression[Any]] = {
-    "name": HostedZone.sort_key,
+    "default": HostedZone.sort_key,
+    "name": HostedZone.name,
     "type": HostedZone.type,
     "description": HostedZone.description.collate("NOCASE"),
     "id": HostedZone.id,

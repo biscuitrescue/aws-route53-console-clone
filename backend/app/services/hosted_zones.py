@@ -18,11 +18,12 @@ from app.domain.identifiers import (
 )
 from app.errors import ConflictError, InvalidDomainNameError, InvalidInputError, NotFoundError
 from app.models import HostedZone, HostedZoneTag, HostedZoneVpc, User
+from app.models.base import utcnow
 from app.repositories import hosted_zones as zone_repository
 from app.repositories import records as record_repository
 from app.repositories.filtering import parse_filter
 from app.repositories.hosted_zones import ZoneRow
-from app.schemas.hosted_zone import HostedZoneCreate, Tag, VpcAssociation
+from app.schemas.hosted_zone import HostedZoneCreate, HostedZoneUpdate, Tag, VpcAssociation
 from app.services.record_rules import RecordDraft, build_record
 
 MAX_TAGS = 50
@@ -145,11 +146,50 @@ def create_zone(db: Session, user: User, payload: HostedZoneCreate) -> ZoneRow:
     return ZoneRow(zone, len(zone.record_sets), name_servers)
 
 
-def update_zone(db: Session, user: User, zone_id: str, description: str) -> ZoneRow:
-    """Only the description (the zone's comment) can change after creation."""
+def _replace_tags(zone: HostedZone, tags: Sequence[HostedZoneTag]) -> None:
+    """Make the zone's tags equal ``tags``, keeping the rows whose key stays."""
+    replacements = {tag.key: tag for tag in tags}
+    for existing in list(zone.tags):
+        replacement = replacements.pop(existing.key, None)
+        if replacement is None:
+            zone.tags.remove(existing)
+        else:
+            existing.value = replacement.value
+    zone.tags.extend(replacements.values())
+
+
+def _replace_vpcs(zone: HostedZone, vpcs: Sequence[HostedZoneVpc]) -> None:
+    """Make the zone's VPC associations equal ``vpcs``, keeping the rows whose VPC stays."""
+    replacements = {vpc.vpc_id: vpc for vpc in vpcs}
+    for existing in list(zone.vpcs):
+        replacement = replacements.pop(existing.vpc_id, None)
+        if replacement is None:
+            zone.vpcs.remove(existing)
+        else:
+            existing.region = replacement.region
+    zone.vpcs.extend(replacements.values())
+
+
+def update_zone(db: Session, user: User, zone_id: str, changes: HostedZoneUpdate) -> ZoneRow:
+    """Edit what can change after creation: the description, tags and VPC associations.
+
+    Everything is validated before the zone is touched and saved in one transaction, so
+    a rejected edit changes nothing.
+    """
     row = get_zone(db, user, zone_id)
-    row.zone.description = description.strip()
+    zone = row.zone
+    tags = None if changes.tags is None else _validated_tags(changes.tags)
+    vpcs = None if changes.vpcs is None else _validated_vpcs(ZoneType(zone.type), changes.vpcs)
+
+    if changes.description is not None:
+        zone.description = changes.description.strip()
+    if tags is not None:
+        _replace_tags(zone, tags)
+    if vpcs is not None:
+        _replace_vpcs(zone, vpcs)
+    zone.updated_at = utcnow()
     db.commit()
+    db.refresh(zone, attribute_names=["tags", "vpcs"])
     return row
 
 
@@ -167,14 +207,7 @@ def delete_zone(db: Session, user: User, zone_id: str) -> None:
 
 def replace_tags(db: Session, user: User, zone_id: str, tags: Sequence[Tag]) -> list[HostedZoneTag]:
     zone = get_zone(db, user, zone_id).zone
-    replacements = {tag.key: tag for tag in _validated_tags(tags)}
-    for existing in list(zone.tags):
-        replacement = replacements.pop(existing.key, None)
-        if replacement is None:
-            zone.tags.remove(existing)
-        else:
-            existing.value = replacement.value
-    zone.tags.extend(replacements.values())
+    _replace_tags(zone, _validated_tags(tags))
     db.commit()
     db.refresh(zone, attribute_names=["tags"])
     return zone.tags

@@ -3,7 +3,19 @@
 from collections.abc import Sequence
 from typing import Any
 
-from sqlalchemy import ColumnElement, SQLColumnExpression, and_, exists, func, not_, or_, select
+from sqlalchemy import (
+    ColumnElement,
+    SQLColumnExpression,
+    String,
+    and_,
+    case,
+    cast,
+    exists,
+    func,
+    not_,
+    or_,
+    select,
+)
 from sqlalchemy.orm import Session
 
 from app.domain.enums import RecordType
@@ -66,6 +78,30 @@ def _any_condition(operator: FilterOperator, value: str) -> ColumnElement[bool]:
     return not_(matches) if operator is FilterOperator.NOT_CONTAINS else matches
 
 
+_FIRST_VALUE = (
+    select(RecordValue.value)
+    .where(RecordValue.record_set_id == RecordSet.id, RecordValue.position == 0)
+    .correlate(RecordSet)
+    .scalar_subquery()
+)
+
+# What tells apart the records of a routed group: weight, Region, failover role or location.
+_DIFFERENTIATOR = func.coalesce(
+    cast(RecordSet.weight, String),
+    RecordSet.region,
+    RecordSet.failover,
+    RecordSet.geo_country_code,
+    RecordSet.geo_continent_code,
+    "",
+)
+
+
+def _evaluate_target_health_condition(operator: FilterOperator, value: str) -> ColumnElement[bool]:
+    wanted = value.strip().lower() in ("yes", "true", "1")
+    matches = and_(RecordSet.is_alias, RecordSet.evaluate_target_health.is_(wanted))
+    return not_(matches) if operator is FilterOperator.NE else matches
+
+
 _FILTER_FIELDS: dict[str, Condition] = {
     "any": _any_condition,
     "name": fqdn_condition(RecordSet.name),
@@ -73,20 +109,29 @@ _FILTER_FIELDS: dict[str, Condition] = {
     "value": _value_condition,
     "ttl": number_condition(RecordSet.ttl),
     "routing_policy": text_condition(RecordSet.routing_policy),
+    "differentiator": text_condition(_DIFFERENTIATOR),
     "set_identifier": text_condition(RecordSet.set_identifier),
     "alias": _alias_condition,
+    "evaluate_target_health": _evaluate_target_health_condition,
     "health_check_id": text_condition(func.coalesce(RecordSet.health_check_id, "")),
     "id": text_condition(RecordSet.id),
 }
 
 _SORT_FIELDS: dict[str, SQLColumnExpression[Any]] = {
+    # Unsorted, records are grouped by domain; sorting by name is plain alphabetical.
     "default": RecordSet.sort_key,
-    "name": RecordSet.sort_key,
+    "name": RecordSet.name,
     "type": RecordSet.type,
     "ttl": RecordSet.ttl,
     "routing_policy": RecordSet.routing_policy,
+    "differentiator": _DIFFERENTIATOR.collate("NOCASE"),
     "set_identifier": RecordSet.set_identifier.collate("NOCASE"),
     "alias": RecordSet.is_alias,
+    "value": func.coalesce(RecordSet.alias_target_dns_name, _FIRST_VALUE, "").collate("NOCASE"),
+    "health_check_id": func.coalesce(RecordSet.health_check_id, "").collate("NOCASE"),
+    "evaluate_target_health": case(
+        (RecordSet.is_alias, cast(RecordSet.evaluate_target_health, String)), else_=""
+    ),
     "id": RecordSet.id,
 }
 

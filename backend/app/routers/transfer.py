@@ -1,3 +1,4 @@
+import re
 from typing import Annotated
 
 from fastapi import APIRouter, Query
@@ -15,9 +16,14 @@ router = APIRouter(
 )
 
 
+# Zone names may contain quotes, slashes and other characters that have no place in a
+# header value or a file name.
+_UNSAFE_FILENAME_CHARACTERS = re.compile(r"[^A-Za-z0-9._-]")
+
+
 def _attachment(zone_name: str, extension: str) -> dict[str, str]:
-    filename = f"{zone_name.removesuffix('.')}.{extension}"
-    return {"Content-Disposition": f'attachment; filename="{filename}"'}
+    stem = _UNSAFE_FILENAME_CHARACTERS.sub("_", zone_name.removesuffix("."))
+    return {"Content-Disposition": f'attachment; filename="{stem}.{extension}"'}
 
 
 @router.get(

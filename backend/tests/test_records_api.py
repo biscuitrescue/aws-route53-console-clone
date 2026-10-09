@@ -3,6 +3,7 @@ from typing import Any
 import pytest
 from fastapi.testclient import TestClient
 
+from app.services import record_rules
 from tests.conftest import API, create_record, create_zone
 
 ONE_OF_EACH: list[tuple[str, str, list[str]]] = [
@@ -356,10 +357,15 @@ def test_value_filter_can_be_negated(client: TestClient, populated: dict[str, An
 @pytest.mark.parametrize(
     ("params", "first", "last"),
     [
-        ({"sort": "name"}, "example.com. CAA", "www.example.com. AAAA"),
-        ({"sort": "name", "order": "desc"}, "www.example.com. A", "example.com. TXT"),
+        ({"sort": "default"}, "example.com. CAA", "www.example.com. AAAA"),
+        ({"sort": "default", "order": "desc"}, "www.example.com. A", "example.com. TXT"),
+        # Plain alphabetical, as when the console's column header is clicked.
+        ({"sort": "name"}, "10.example.com. PTR", "www.example.com. AAAA"),
+        ({"sort": "name", "order": "desc"}, "www.example.com. A", "10.example.com. PTR"),
         ({"sort": "type"}, "www.example.com. A", "example.com. TXT"),
         ({"sort": "ttl", "order": "desc"}, "example.com. NS", "www.example.com. AAAA"),
+        ({"sort": "value"}, "example.com. TXT", "blog.example.com. CNAME"),
+        ({"sort": "value", "order": "desc"}, "10.example.com. PTR", "example.com. TXT"),
     ],
 )
 def test_sorting(
@@ -367,6 +373,37 @@ def test_sorting(
 ) -> None:
     listed = _listed(client, populated, **params)
     assert (listed[0], listed[-1]) == (first, last)
+
+
+def test_sorting_by_what_tells_routed_records_apart(
+    client: TestClient, zone: dict[str, Any]
+) -> None:
+    for identifier, weight in (("heavy", 200), ("light", 5), ("middle", 50)):
+        response = _post(
+            client,
+            zone,
+            name="app",
+            type="A",
+            values=["192.0.2.1"],
+            routing_policy="weighted",
+            set_identifier=identifier,
+            weight=weight,
+            health_check_id=f"check-{identifier}",
+        )
+        assert response.status_code == 201, response.text
+
+    def identifiers(**params: Any) -> list[str]:
+        items = client.get(_url(zone), params={"type": "A", **params}).json()["items"]
+        return [item["set_identifier"] for item in items]
+
+    # Weights are compared as text, as the console's Differentiator column shows them.
+    assert identifiers(sort="differentiator") == ["heavy", "light", "middle"]
+    assert identifiers(sort="set_identifier", order="desc") == ["middle", "light", "heavy"]
+    assert identifiers(sort="health_check_id", order="desc") == ["middle", "light", "heavy"]
+    assert identifiers(filter="differentiator:contains:5") == ["light", "middle"]
+    assert identifiers(filter="differentiator:eq:200") == ["heavy"]
+    assert identifiers(filter="evaluate_target_health:eq:yes") == []
+    assert client.get(_url(zone), params={"sort": "evaluate_target_health"}).status_code == 200
 
 
 def test_pagination(client: TestClient, populated: dict[str, Any]) -> None:
@@ -663,3 +700,17 @@ def test_a_routed_group_shares_the_last_ttl_given(client: TestClient, zone: dict
     # A simple record with the same name under another type is not part of the group.
     other = _post(client, zone, name="lb", type="TXT", values=['"x"'], ttl=900).json()
     assert client.get(_url(zone, f"/{other['id']}")).json()["ttl"] == 900
+
+
+def test_a_constraint_violation_is_a_conflict_not_a_server_error(
+    client: TestClient, zone: dict[str, Any], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Two identical requests racing past the service's check meet the unique index."""
+    assert _post(client, zone, name="race", type="A", values=["192.0.2.1"]).status_code == 201
+    monkeypatch.setattr(record_rules, "check_conflicts", lambda *args, **kwargs: None)
+
+    response = _post(client, zone, name="race", type="A", values=["192.0.2.2"])
+    assert response.status_code == 409
+    assert response.json()["code"] == "PriorRequestNotComplete"
+    assert "sqlite" not in response.text.lower()
+    assert _listed(client, zone, filter="name:eq:race.example.com") == ["race.example.com. A"]

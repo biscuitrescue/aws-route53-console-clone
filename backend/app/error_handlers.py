@@ -6,6 +6,7 @@ from typing import Any
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
+from sqlalchemy.exc import IntegrityError
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app.errors import AppError
@@ -48,6 +49,18 @@ async def _handle_http_error(_request: Request, exc: Exception) -> JSONResponse:
     )
 
 
+async def _handle_integrity_error(request: Request, exc: Exception) -> JSONResponse:
+    """A constraint caught what the service checks missed: two requests raced each other."""
+    logger.warning("Constraint violation on %s %s: %s", request.method, request.url.path, exc)
+    return JSONResponse(
+        _body(
+            "PriorRequestNotComplete",
+            "The request conflicts with a change that was made at the same time. Try again.",
+        ),
+        status_code=409,
+    )
+
+
 async def _handle_unexpected_error(request: Request, exc: Exception) -> JSONResponse:
     logger.exception("Unhandled error on %s %s", request.method, request.url.path, exc_info=exc)
     return JSONResponse(
@@ -60,4 +73,5 @@ def register_error_handlers(app: FastAPI) -> None:
     app.add_exception_handler(AppError, _handle_app_error)
     app.add_exception_handler(RequestValidationError, _handle_validation_error)
     app.add_exception_handler(StarletteHTTPException, _handle_http_error)
+    app.add_exception_handler(IntegrityError, _handle_integrity_error)
     app.add_exception_handler(Exception, _handle_unexpected_error)
