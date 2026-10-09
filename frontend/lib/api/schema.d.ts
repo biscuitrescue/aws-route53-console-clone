@@ -133,7 +133,7 @@ export interface paths {
         head?: never;
         /**
          * Edit a hosted zone
-         * @description Only the description can be changed after a zone is created.
+         * @description The description, the tags and, for a private zone, the VPC associations can be changed after a zone is created. Omitted fields keep their value; the edit is applied as a whole or not at all.
          */
         patch: operations["update_hosted_zone"];
         trace?: never;
@@ -485,10 +485,23 @@ export interface components {
              */
             updated_at: string;
         };
-        /** HostedZoneUpdate */
+        /**
+         * HostedZoneUpdate
+         * @description Partial update; omitted fields keep their current value.
+         */
         HostedZoneUpdate: {
             /** Description */
-            description: string;
+            description?: string | null;
+            /**
+             * Tags
+             * @description Replaces every tag of the zone
+             */
+            tags?: components["schemas"]["Tag"][] | null;
+            /**
+             * Vpcs
+             * @description Replaces the VPC associations of a private zone
+             */
+            vpcs?: components["schemas"]["VpcAssociation"][] | null;
         };
         /** ImportSummary */
         ImportSummary: {
@@ -958,7 +971,7 @@ export interface operations {
                 filter?: string[];
                 /** @description Whether all filters must match or any of them */
                 filter_mode?: "and" | "or";
-                /** @description name, type, description, id, created_by, record_count or created_at */
+                /** @description default (Route 53 order), name, type, description, id, created_by, record_count or created_at */
                 sort?: string;
                 /** @description Sort direction */
                 order?: "asc" | "desc";
@@ -1356,7 +1369,7 @@ export interface operations {
                 filter?: string[];
                 /** @description Whether all filters must match or any of them */
                 filter_mode?: "and" | "or";
-                /** @description default (Route 53 order), name, type, ttl, routing_policy, set_identifier, alias or id */
+                /** @description default (Route 53 order), name, type, ttl, routing_policy, differentiator, set_identifier, alias, value, health_check_id, evaluate_target_health or id */
                 sort?: string;
                 /** @description Sort direction */
                 order?: "asc" | "desc";

@@ -137,12 +137,13 @@ export function EditRecordForm({ zone, record, onClose, onSaved }: EditRecordFor
     >
       <SpaceBetween size="l">
         <RecordFields
-          zoneName={zone.name}
+          zone={zone}
           draft={draft}
           errors={errors}
           onChange={change}
           columns={1}
           identityLocked={isZoneDefault}
+          autoFocus
         />
         <Box float="right">
           <SpaceBetween direction="horizontal" size="xs">

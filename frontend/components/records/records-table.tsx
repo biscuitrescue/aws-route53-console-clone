@@ -17,6 +17,7 @@ import { SearchModeNote } from "@/components/common/search-mode-note";
 import { TablePreferencesButton } from "@/components/common/table-preferences";
 import { InfoLink } from "@/components/shell/help-context";
 import { useFollow } from "@/hooks/use-follow";
+import { usePropertyOperatorCompletion } from "@/hooks/use-property-operator-completion";
 import { useRecords } from "@/hooks/use-records";
 import { useShortcut } from "@/hooks/use-shortcuts";
 import { useTablePreferences } from "@/hooks/use-table-preferences";
@@ -24,20 +25,21 @@ import type { ColumnChoice } from "@/hooks/use-table-preferences";
 import type { HostedZone, RecordSet } from "@/lib/api/types";
 import { displayName, formatNumber, orDash, routingPolicyLabel } from "@/lib/format";
 import {
+  CONTAINS_ONLY,
   EMPTY_QUERY,
-  EXACT_OPERATORS,
+  EQUALS_ONLY,
   matchesText,
   NUMBER_OPERATORS,
-  TEXT_OPERATORS,
   toApiFilters,
 } from "@/lib/property-filter";
 import { differentiator, recordTargets } from "@/lib/record-draft";
 import { filterableRecordTypes, routingPolicies } from "@/lib/record-types";
 import { routes } from "@/lib/routes";
+import styles from "./records-table.module.css";
 import { ValueLines } from "./value-lines";
 
 const COLUMNS: ColumnChoice[] = [
-  { id: "name", label: "Record name", alwaysVisible: true },
+  { id: "name", label: "Record name" },
   { id: "type", label: "Type" },
   { id: "routing_policy", label: "Routing policy" },
   { id: "differentiator", label: "Differentiator" },
@@ -54,34 +56,43 @@ const FILTERING_PROPERTIES: PropertyFilterProps.FilteringProperty[] = [
     key: "name",
     propertyLabel: "Record name",
     groupValuesLabel: "Record name values",
-    operators: TEXT_OPERATORS,
+    operators: CONTAINS_ONLY,
+    defaultOperator: ":",
   },
   {
     key: "type",
     propertyLabel: "Type",
     groupValuesLabel: "Type values",
-    operators: EXACT_OPERATORS,
+    operators: EQUALS_ONLY,
     defaultOperator: "=",
   },
   {
     key: "routing_policy",
     propertyLabel: "Routing policy",
     groupValuesLabel: "Routing policy values",
-    operators: EXACT_OPERATORS,
+    operators: EQUALS_ONLY,
     defaultOperator: "=",
+  },
+  {
+    key: "differentiator",
+    propertyLabel: "Differentiator",
+    groupValuesLabel: "Differentiator values",
+    operators: CONTAINS_ONLY,
+    defaultOperator: ":",
   },
   {
     key: "alias",
     propertyLabel: "Alias",
     groupValuesLabel: "Alias values",
-    operators: ["="],
+    operators: EQUALS_ONLY,
     defaultOperator: "=",
   },
   {
     key: "value",
     propertyLabel: "Value/Route traffic to",
     groupValuesLabel: "Values",
-    operators: TEXT_OPERATORS,
+    operators: CONTAINS_ONLY,
+    defaultOperator: ":",
   },
   {
     key: "ttl",
@@ -94,13 +105,22 @@ const FILTERING_PROPERTIES: PropertyFilterProps.FilteringProperty[] = [
     key: "health_check_id",
     propertyLabel: "Health check ID",
     groupValuesLabel: "Health check ID values",
-    operators: TEXT_OPERATORS,
+    operators: CONTAINS_ONLY,
+    defaultOperator: ":",
+  },
+  {
+    key: "evaluate_target_health",
+    propertyLabel: "Evaluate target health",
+    groupValuesLabel: "Evaluate target health values",
+    operators: EQUALS_ONLY,
+    defaultOperator: "=",
   },
   {
     key: "set_identifier",
     propertyLabel: "Record ID",
     groupValuesLabel: "Record ID values",
-    operators: TEXT_OPERATORS,
+    operators: CONTAINS_ONLY,
+    defaultOperator: ":",
   },
 ];
 
@@ -118,6 +138,7 @@ const FILTERING_OPTIONS: PropertyFilterProps.FilteringOption[] = [
   ...TYPE_OPTIONS.map((option) => ({ propertyKey: "type", value: option.value })),
   ...POLICY_OPTIONS.map((option) => ({ propertyKey: "routing_policy", value: option.value })),
   ...ALIAS_OPTIONS.map((option) => ({ propertyKey: "alias", value: option.value })),
+  ...["Yes", "No"].map((value) => ({ propertyKey: "evaluate_target_health", value })),
 ];
 
 /** Convert a displayed filter value into the one the API stores. */
@@ -130,6 +151,7 @@ function toApiValue(field: string, value: string): string {
   }
   if (field === "alias")
     return value.toLowerCase() === "alias" || value.toLowerCase() === "yes" ? "yes" : "no";
+  if (field === "evaluate_target_health") return value.toLowerCase() === "yes" ? "yes" : "no";
   return value;
 }
 
@@ -155,13 +177,14 @@ export function RecordsTable({ zone, selected, onSelectionChange, onDelete }: Re
   const follow = useFollow();
   const filterRef = useRef<PropertyFilterProps.Ref>(null);
   const preferencesRef = useRef<HTMLDivElement>(null);
+  const filterContainer = usePropertyOperatorCompletion(FILTERING_PROPERTIES);
 
   const [preferences, setPreferences] = useTablePreferences("records", COLUMNS);
   const [query, setQuery] = useState(EMPTY_QUERY);
   const [sorting, setSorting] = useState<Sorting>(null);
   const [page, setPage] = useState(1);
 
-  const pageSize = preferences.pageSize ?? 50;
+  const pageSize = preferences.pageSize ?? 100;
   const { filters, filterMode } = useMemo(() => toApiFilters(query, toApiValue), [query]);
   const records = useRecords(zone.id, {
     filters,
@@ -210,14 +233,18 @@ export function RecordsTable({ zone, selected, onSelectionChange, onDelete }: Re
   ) => {
     const value = quickFilterValue(query, property);
     return (
-      <Select
-        placeholder={placeholder}
-        ariaLabel={`Filter by ${placeholder.toLowerCase()}`}
-        selectedOption={options.find((option) => option.value === value) ?? null}
-        options={options}
-        onChange={({ detail }) => setQuickFilter(property, detail.selectedOption.value ?? null)}
-        expandToViewport
-      />
+      <div className={styles[property]}>
+        <Select
+          placeholder={placeholder}
+          ariaLabel={`Filter by ${placeholder.toLowerCase()}`}
+          selectedOption={options.find((option) => option.value === value) ?? null}
+          options={options}
+          filteringType="auto"
+          filteringAriaLabel={`Find ${placeholder.toLowerCase()}`}
+          onChange={({ detail }) => setQuickFilter(property, detail.selectedOption.value ?? null)}
+          expandToViewport
+        />
+      </div>
     );
   };
 
@@ -242,6 +269,7 @@ export function RecordsTable({ zone, selected, onSelectionChange, onDelete }: Re
     {
       id: "differentiator",
       header: "Differentiator",
+      sortingField: "differentiator",
       width: 110,
       cell: (record) => orDash(differentiator(record)),
     },
@@ -255,6 +283,7 @@ export function RecordsTable({ zone, selected, onSelectionChange, onDelete }: Re
     {
       id: "value",
       header: "Value/Route traffic to",
+      sortingField: "value",
       width: 240,
       cell: (record) => <ValueLines values={recordTargets(record)} />,
     },
@@ -268,12 +297,14 @@ export function RecordsTable({ zone, selected, onSelectionChange, onDelete }: Re
     {
       id: "health_check_id",
       header: "Health check ID",
+      sortingField: "health_check_id",
       width: 120,
       cell: (record) => orDash(record.health_check_id),
     },
     {
       id: "evaluate_target_health",
       header: "Evaluate target health",
+      sortingField: "evaluate_target_health",
       width: 120,
       cell: (record) =>
         record.alias_target ? (record.alias_target.evaluate_target_health ? "Yes" : "No") : "-",
@@ -314,7 +345,7 @@ export function RecordsTable({ zone, selected, onSelectionChange, onDelete }: Re
       trackBy="id"
       items={items}
       columnDefinitions={columnDefinitions}
-      columnDisplay={preferences.contentDisplay}
+      visibleColumns={preferences.visibleContent}
       wrapLines={preferences.wrapLines}
       loading={records.isPending}
       loadingText="Loading records"
@@ -343,10 +374,11 @@ export function RecordsTable({ zone, selected, onSelectionChange, onDelete }: Re
         <Header
           variant="h2"
           info={<InfoLink topic="records" />}
+          // The counter is the size of the zone; "n matches" reports what the filter found.
           counter={
             selected.length > 0
-              ? `(${selected.length}/${formatNumber(total)})`
-              : `(${formatNumber(total)})`
+              ? `(${selected.length}/${formatNumber(zone.record_count)})`
+              : `(${formatNumber(zone.record_count)})`
           }
           description={
             <SearchModeNote
@@ -362,7 +394,7 @@ export function RecordsTable({ zone, selected, onSelectionChange, onDelete }: Re
                 onClick={() => void records.refetch()}
               />
               <Button disabled={selected.length === 0} onClick={onDelete}>
-                Delete record
+                {selected.length > 1 ? "Delete records" : "Delete record"}
               </Button>
               <Button href={routes.importZoneFile(zone.id)} onFollow={follow}>
                 Import zone file
@@ -377,29 +409,37 @@ export function RecordsTable({ zone, selected, onSelectionChange, onDelete }: Re
         </Header>
       }
       filter={
-        <PropertyFilter
-          ref={filterRef}
-          query={query}
-          onChange={({ detail }) => changeQuery(detail)}
-          filteringProperties={FILTERING_PROPERTIES}
-          filteringOptions={FILTERING_OPTIONS}
-          filteringPlaceholder="Filter records by property or value"
-          filteringAriaLabel="Filter records by property or value"
-          countText={filtering && records.data ? matchesText(total) : undefined}
-          expandToViewport
-        />
-      }
-      pagination={
-        <SpaceBetween direction="horizontal" size="xs" alignItems="center">
+        <div className={styles.filters}>
+          <div className={styles.propertyFilter} ref={filterContainer}>
+            <PropertyFilter
+              ref={filterRef}
+              query={query}
+              onChange={({ detail }) => changeQuery(detail)}
+              filteringProperties={FILTERING_PROPERTIES}
+              filteringOptions={FILTERING_OPTIONS}
+              filteringPlaceholder="Filter records by property or value"
+              filteringAriaLabel="Filter records by property or value"
+              countText={filtering && records.data ? matchesText(total) : undefined}
+              expandToViewport
+            />
+          </div>
           {quickFilter("type", "Type", TYPE_OPTIONS)}
           {quickFilter("routing_policy", "Routing policy", POLICY_OPTIONS)}
           {quickFilter("alias", "Alias", ALIAS_OPTIONS)}
-          <Pagination
-            currentPageIndex={page}
-            pagesCount={records.data?.pages ?? 1}
-            onChange={({ detail }) => setPage(detail.currentPageIndex)}
-          />
-        </SpaceBetween>
+          {/* The console repeats the match count after the selects. */}
+          {filtering && records.data && (
+            <span className={styles.count} aria-hidden="true">
+              {matchesText(total)}
+            </span>
+          )}
+        </div>
+      }
+      pagination={
+        <Pagination
+          currentPageIndex={page}
+          pagesCount={records.data?.pages ?? 1}
+          onChange={({ detail }) => setPage(detail.currentPageIndex)}
+        />
       }
       preferences={
         <div ref={preferencesRef}>

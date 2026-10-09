@@ -8,7 +8,11 @@ import type { RecordListParams } from "@/lib/api/params";
 import { queryKeys } from "@/lib/api/query-keys";
 import type { Change, RecordSetInput, RecordSetUpdate } from "@/lib/api/types";
 
-export function useRecords(zoneId: string, params: RecordListParams) {
+export function useRecords(
+  zoneId: string,
+  params: RecordListParams,
+  options: { enabled?: boolean } = {},
+) {
   return useQuery({
     queryKey: queryKeys.recordList(zoneId, params),
     queryFn: () =>
@@ -21,6 +25,7 @@ export function useRecords(zoneId: string, params: RecordListParams) {
         }),
       ),
     placeholderData: keepPreviousData,
+    enabled: options.enabled ?? true,
   });
 }
 

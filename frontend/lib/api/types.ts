@@ -9,6 +9,7 @@ export type ZoneType = Schemas["ZoneType"];
 export type HostedZoneSummary = Schemas["HostedZoneSummary"];
 export type HostedZone = Schemas["HostedZoneDetail"];
 export type HostedZoneCreate = Schemas["HostedZoneCreate"];
+export type HostedZoneUpdate = Schemas["HostedZoneUpdate"];
 export type Tag = Schemas["Tag"];
 export type VpcAssociation = Schemas["VpcAssociation"];
 

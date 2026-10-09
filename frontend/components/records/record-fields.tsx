@@ -12,14 +12,16 @@ import Textarea from "@cloudscape-design/components/textarea";
 import Toggle from "@cloudscape-design/components/toggle";
 
 import { InfoLink } from "@/components/shell/help-context";
-import type { RecordType, RoutingPolicy } from "@/lib/api/types";
+import { useRecords } from "@/hooks/use-records";
+import { aliasEndpoint, aliasEndpoints, ZONE_RECORD_ENDPOINT } from "@/lib/alias-endpoints";
+import type { HostedZone, RecordType, RoutingPolicy } from "@/lib/api/types";
 import { awsRegions } from "@/lib/aws-regions";
 import { displayName } from "@/lib/format";
 import type { RecordDraft, RecordErrors } from "@/lib/record-draft";
 import {
   recordTypeInfo,
-  recordTypes,
-  routingPolicies,
+  recordTypeOptions,
+  routingPolicyOptions,
   soaType,
   TTL_PRESETS,
 } from "@/lib/record-types";
@@ -39,11 +41,11 @@ const FAILOVER_ROLES = [
   { value: "SECONDARY", label: "Secondary" },
 ];
 
-const TYPE_OPTIONS = recordTypes.map(({ value, label }) => ({ value, label }));
-const POLICY_OPTIONS = routingPolicies.map(({ value, label }) => ({ value, label }));
+const ENDPOINT_OPTIONS = aliasEndpoints.map(({ value, label }) => ({ value, label }));
+const ZONE_RECORDS = { page: 1, pageSize: 500 };
 
 interface RecordFieldsProps {
-  zoneName: string;
+  zone: Pick<HostedZone, "id" | "name">;
   draft: RecordDraft;
   errors: RecordErrors;
   onChange: (change: Partial<RecordDraft>) => void;
@@ -51,20 +53,42 @@ interface RecordFieldsProps {
   columns: 1 | 2;
   /** The zone's own NS and SOA keep their name, type and routing policy. */
   identityLocked?: boolean;
+  /** Put the cursor in the record name when the fields appear. */
+  autoFocus?: boolean;
+  /** The wizard chooses the routing policy in its first step, so the select is left out. */
+  policyFixed?: boolean;
 }
 
 /** The fields of one record, shared by quick create and the edit panel. */
 export function RecordFields({
-  zoneName,
+  zone,
   draft,
   errors,
   onChange,
   columns,
   identityLocked = false,
+  autoFocus = false,
+  policyFixed = false,
 }: RecordFieldsProps) {
   const typeInfo = recordTypeInfo(draft.type);
+  const zoneName = zone.name;
   const typeOptions =
-    draft.type === "SOA" ? [{ value: soaType.value, label: soaType.label }] : TYPE_OPTIONS;
+    draft.type === "SOA" ? [{ value: soaType.value, label: soaType.label }] : recordTypeOptions;
+
+  // An alias can point at another record of the same type in this zone.
+  const aliasesZoneRecord = draft.alias && draft.aliasEndpoint === ZONE_RECORD_ENDPOINT;
+  const siblings = useRecords(
+    zone.id,
+    { ...ZONE_RECORDS, types: [draft.type] },
+    { enabled: aliasesZoneRecord },
+  );
+  const ownName = `${draft.name.trim() ? `${draft.name.trim().toLowerCase()}.` : ""}${zoneName}`;
+  const siblingOptions = (siblings.data?.items ?? [])
+    .filter((record) => record.name !== ownName)
+    .map((record) => ({ value: displayName(record.name), label: displayName(record.name) }));
+  const endpoint = aliasEndpoint(draft.aliasEndpoint);
+  // An alias saved before, whose kind of endpoint cannot be told from its target.
+  const hasTarget = endpoint !== undefined || draft.aliasDnsName !== "";
   const aliasAllowed = draft.type !== "NS" && draft.type !== "SOA";
   const simpleOnly = draft.type === "NS" || draft.type === "SOA";
 
@@ -81,6 +105,7 @@ export function RecordFields({
           value={draft.name}
           placeholder="subdomain"
           disabled={identityLocked}
+          autoFocus={autoFocus}
           spellcheck={false}
           onChange={({ detail }) => onChange({ name: detail.value })}
         />
@@ -114,27 +139,74 @@ export function RecordFields({
       errorText={errors.alias}
       stretch
     >
-      <SpaceBetween size="xs">
-        <Input
-          value={draft.aliasDnsName}
-          placeholder="Alias target, for example d111111abcdef8.cloudfront.net"
-          ariaLabel="Alias target DNS name"
-          spellcheck={false}
-          onChange={({ detail }) => onChange({ aliasDnsName: detail.value })}
+      <SpaceBetween size="xxxs">
+        <Select
+          placeholder="Choose endpoint"
+          ariaLabel="Alias endpoint"
+          selectedOption={ENDPOINT_OPTIONS.find((o) => o.value === draft.aliasEndpoint) ?? null}
+          options={ENDPOINT_OPTIONS}
+          filteringType="auto"
+          onChange={({ detail }) => {
+            const chosen = aliasEndpoint(detail.selectedOption.value ?? "");
+            onChange({
+              aliasEndpoint: chosen?.value ?? "",
+              aliasDnsName: "",
+              aliasHostedZoneId:
+                chosen?.value === ZONE_RECORD_ENDPOINT ? zone.id : (chosen?.hostedZoneId ?? ""),
+            });
+          }}
         />
-        <Input
-          value={draft.aliasHostedZoneId}
-          placeholder="Hosted zone ID of the target, for example Z2FDTNDATAQYW2"
-          ariaLabel="Alias target hosted zone ID"
-          spellcheck={false}
-          onChange={({ detail }) => onChange({ aliasHostedZoneId: detail.value })}
-        />
-        <Toggle
-          checked={draft.evaluateTargetHealth}
-          onChange={({ detail }) => onChange({ evaluateTargetHealth: detail.checked })}
-        >
-          Evaluate target health
-        </Toggle>
+        {aliasesZoneRecord ? (
+          <Select
+            placeholder="Choose record"
+            ariaLabel="Record to route traffic to"
+            selectedOption={siblingOptions.find((o) => o.value === draft.aliasDnsName) ?? null}
+            options={siblingOptions}
+            filteringType="auto"
+            statusType={siblings.isPending ? "loading" : "finished"}
+            loadingText="Loading records"
+            empty={`No other ${draft.type} records in this hosted zone`}
+            onChange={({ detail }) => onChange({ aliasDnsName: detail.selectedOption.value ?? "" })}
+          />
+        ) : (
+          <Select
+            placeholder="Choose Region"
+            ariaLabel="Region of the endpoint"
+            selectedOption={awsRegions.find((r) => r.value === draft.aliasRegion) ?? null}
+            options={awsRegions}
+            filteringType="auto"
+            disabled={endpoint?.hostedZoneId !== undefined}
+            onChange={({ detail }) => onChange({ aliasRegion: detail.selectedOption.value ?? "" })}
+          />
+        )}
+        {hasTarget && !aliasesZoneRecord && (
+          <>
+            <Input
+              value={draft.aliasDnsName}
+              placeholder="DNS name of the resource, for example d111111abcdef8.cloudfront.net"
+              ariaLabel="Alias target DNS name"
+              spellcheck={false}
+              onChange={({ detail }) => onChange({ aliasDnsName: detail.value })}
+            />
+            <Input
+              value={draft.aliasHostedZoneId}
+              placeholder="Hosted zone ID of the resource, for example Z2FDTNDATAQYW2"
+              ariaLabel="Alias target hosted zone ID"
+              spellcheck={false}
+              onChange={({ detail }) => onChange({ aliasHostedZoneId: detail.value })}
+            />
+          </>
+        )}
+        {hasTarget && (
+          <Box padding={{ top: "xs" }}>
+            <Toggle
+              checked={draft.evaluateTargetHealth}
+              onChange={({ detail }) => onChange({ evaluateTargetHealth: detail.checked })}
+            >
+              Evaluate target health
+            </Toggle>
+          </Box>
+        )}
       </SpaceBetween>
     </FormField>
   ) : (
@@ -148,7 +220,7 @@ export function RecordFields({
       <Textarea
         value={draft.values}
         placeholder={typeInfo.placeholder}
-        rows={columns === 2 ? 3 : 4}
+        rows={4}
         spellcheck={false}
         onChange={({ detail }) => onChange({ values: detail.value })}
       />
@@ -187,13 +259,13 @@ export function RecordFields({
     </FormField>
   );
 
-  const policyField = (
+  const policyField = !policyFixed && (
     <FormField label="Routing policy" info={<InfoLink topic="routing-policy" />} stretch>
       <Select
         selectedOption={
-          POLICY_OPTIONS.find((option) => option.value === draft.routingPolicy) ?? null
+          routingPolicyOptions.find((option) => option.value === draft.routingPolicy) ?? null
         }
-        options={POLICY_OPTIONS}
+        options={routingPolicyOptions}
         disabled={identityLocked || simpleOnly}
         onChange={({ detail }) =>
           onChange({ routingPolicy: detail.selectedOption.value as RoutingPolicy })
@@ -313,9 +385,10 @@ export function RecordFields({
       </ColumnLayout>
       {aliasToggle}
       {valueField}
+      {/* Alias records have no TTL, and the routing policy takes its place. */}
       <ColumnLayout columns={2}>
-        {ttlField || <div />}
-        {policyField}
+        {ttlField || policyField}
+        {ttlField ? policyField : <div />}
       </ColumnLayout>
       {policyDetails}
     </SpaceBetween>

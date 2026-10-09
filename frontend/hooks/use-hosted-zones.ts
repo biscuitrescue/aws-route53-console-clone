@@ -6,9 +6,9 @@ import { api, unwrap } from "@/lib/api/client";
 import { toListQuery } from "@/lib/api/params";
 import type { ZoneListParams } from "@/lib/api/params";
 import { queryKeys } from "@/lib/api/query-keys";
-import type { HostedZoneCreate, Tag } from "@/lib/api/types";
+import type { HostedZoneCreate, HostedZoneUpdate } from "@/lib/api/types";
 
-export function useHostedZones(params: ZoneListParams) {
+export function useHostedZones(params: ZoneListParams, options: { enabled?: boolean } = {}) {
   return useQuery({
     queryKey: queryKeys.zoneList(params),
     queryFn: () =>
@@ -19,6 +19,7 @@ export function useHostedZones(params: ZoneListParams) {
       ),
     // Keep the current rows on screen while the next page or filter loads.
     placeholderData: keepPreviousData,
+    enabled: options.enabled ?? true,
   });
 }
 
@@ -45,14 +46,18 @@ export function useCreateHostedZone() {
 export function useUpdateHostedZone(zoneId: string) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (description: string) =>
+    // Description, tags and VPC associations are saved together, or not at all.
+    mutationFn: (changes: HostedZoneUpdate) =>
       unwrap(
         api.PATCH("/api/v1/hostedzones/{zone_id}", {
           params: { path: { zone_id: zoneId } },
-          body: { description },
+          body: changes,
         }),
       ),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.zones }),
+    onSuccess: (zone) => {
+      queryClient.setQueryData(queryKeys.zone(zoneId), zone);
+      return queryClient.invalidateQueries({ queryKey: queryKeys.zoneLists });
+    },
   });
 }
 
@@ -67,19 +72,5 @@ export function useDeleteHostedZone() {
       queryClient.removeQueries({ queryKey: queryKeys.zone(zoneId) });
       return queryClient.invalidateQueries({ queryKey: queryKeys.zones });
     },
-  });
-}
-
-export function useReplaceTags(zoneId: string) {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: (tags: Tag[]) =>
-      unwrap(
-        api.PUT("/api/v1/hostedzones/{zone_id}/tags", {
-          params: { path: { zone_id: zoneId } },
-          body: { tags },
-        }),
-      ),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.zone(zoneId) }),
   });
 }

@@ -2,7 +2,6 @@
 
 import Box from "@cloudscape-design/components/box";
 import Button from "@cloudscape-design/components/button";
-import ColumnLayout from "@cloudscape-design/components/column-layout";
 import Container from "@cloudscape-design/components/container";
 import ContentLayout from "@cloudscape-design/components/content-layout";
 import Form from "@cloudscape-design/components/form";
@@ -18,36 +17,42 @@ import { ConsolePage } from "@/components/shell/console-page";
 import { InfoLink } from "@/components/shell/help-context";
 import { useNotify } from "@/components/shell/notifications";
 import { useFollow } from "@/hooks/use-follow";
-import { useHostedZone, useReplaceTags, useUpdateHostedZone } from "@/hooks/use-hosted-zones";
-import type { HostedZone } from "@/lib/api/types";
+import { useHostedZone, useUpdateHostedZone } from "@/hooks/use-hosted-zones";
+import type { HostedZone, VpcAssociation } from "@/lib/api/types";
 import { displayName, formatNumber, zoneTypeLongLabel } from "@/lib/format";
 import { routes } from "@/lib/routes";
 
 import { DESCRIPTION_LIMIT } from "./create-zone-page";
 import { TagsContainer, toApiTags, toEditableTags } from "./tags-container";
 import type { EditableTag } from "./tags-container";
+import { toApiVpcs, vpcsComplete, VpcsContainer } from "./vpcs-container";
 
 function EditZoneForm({ zone }: { zone: HostedZone }) {
   const router = useRouter();
   const follow = useFollow();
   const notify = useNotify();
   const updateZone = useUpdateHostedZone(zone.id);
-  const replaceTags = useReplaceTags(zone.id);
   const name = displayName(zone.name);
+  const isPrivate = zone.type === "private";
 
   const [description, setDescription] = useState(zone.description);
   const [tags, setTags] = useState<readonly EditableTag[]>(() => toEditableTags(zone.tags));
-  const saving = updateZone.isPending || replaceTags.isPending;
+  const [vpcs, setVpcs] = useState<VpcAssociation[]>(zone.vpcs);
+  const [submitted, setSubmitted] = useState(false);
 
-  const submit = async () => {
-    try {
-      await updateZone.mutateAsync(description);
-      await replaceTags.mutateAsync(toApiTags(tags));
-      notify.success(`Hosted zone ${name} was successfully updated.`);
-      router.push(routes.hostedZone(zone.id));
-    } catch (error) {
-      notify.error(error);
-    }
+  const submit = () => {
+    setSubmitted(true);
+    if (isPrivate && !vpcsComplete(vpcs)) return;
+    updateZone.mutate(
+      { description, tags: toApiTags(tags), ...(isPrivate && { vpcs: toApiVpcs(vpcs) }) },
+      {
+        onSuccess: () => {
+          notify.success(`Hosted zone ${name} was successfully updated.`);
+          router.push(routes.hostedZone(zone.id));
+        },
+        onError: notify.error,
+      },
+    );
   };
 
   const facts = [
@@ -68,7 +73,7 @@ function EditZoneForm({ zone }: { zone: HostedZone }) {
       <form
         onSubmit={(event) => {
           event.preventDefault();
-          void submit();
+          submit();
         }}
         noValidate
       >
@@ -83,7 +88,7 @@ function EditZoneForm({ zone }: { zone: HostedZone }) {
               >
                 Cancel
               </Button>
-              <Button variant="primary" formAction="submit" loading={saving}>
+              <Button variant="primary" formAction="submit" loading={updateZone.isPending}>
                 Save changes
               </Button>
             </SpaceBetween>
@@ -101,14 +106,12 @@ function EditZoneForm({ zone }: { zone: HostedZone }) {
               }
             >
               <SpaceBetween size="l">
-                <ColumnLayout columns={4} variant="text-grid">
-                  {facts.map((fact) => (
-                    <div key={fact.label}>
-                      <Box variant="awsui-key-label">{fact.label}</Box>
-                      <div>{fact.value}</div>
-                    </div>
-                  ))}
-                </ColumnLayout>
+                {facts.map((fact) => (
+                  <div key={fact.label}>
+                    <Box variant="awsui-key-label">{fact.label}</Box>
+                    <div>{fact.value}</div>
+                  </div>
+                ))}
                 <FormField
                   label={
                     <>
@@ -129,6 +132,7 @@ function EditZoneForm({ zone }: { zone: HostedZone }) {
                 </FormField>
               </SpaceBetween>
             </Container>
+            {isPrivate && <VpcsContainer vpcs={vpcs} onChange={setVpcs} showErrors={submitted} />}
             <TagsContainer tags={tags} onChange={setTags} />
           </SpaceBetween>
         </Form>

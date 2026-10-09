@@ -1,6 +1,13 @@
-import type { RecordSet, RecordSetInput, RecordType, RoutingPolicy } from "@/lib/api/types";
+import type {
+  ChangeBatchResult,
+  RecordSet,
+  RecordSetInput,
+  RecordType,
+  RoutingPolicy,
+} from "@/lib/api/types";
 import { DEFAULT_TTL } from "@/lib/record-types";
 
+import { endpointForTarget } from "./alias-endpoints";
 import { displayName, subdomainOf } from "./format";
 
 /** The editable state of one record form. Everything is text, as the user typed it. */
@@ -13,6 +20,10 @@ export interface RecordDraft {
   /** One value per line. */
   values: string;
   ttl: string;
+  /** Kind of alias target chosen under "Route traffic to"; a key of `aliasEndpoints`. */
+  aliasEndpoint: string;
+  /** Region of the alias target. Kept in the form only: the API has no use for it. */
+  aliasRegion: string;
   aliasDnsName: string;
   aliasHostedZoneId: string;
   evaluateTargetHealth: boolean;
@@ -46,6 +57,8 @@ export function emptyDraft(): RecordDraft {
     alias: false,
     values: "",
     ttl: String(DEFAULT_TTL),
+    aliasEndpoint: "",
+    aliasRegion: "",
     aliasDnsName: "",
     aliasHostedZoneId: "",
     evaluateTargetHealth: false,
@@ -67,6 +80,10 @@ export function draftFromRecord(record: RecordSet, zoneName: string): RecordDraf
     alias: record.alias,
     values: record.values.join("\n"),
     ttl: record.ttl === null ? String(DEFAULT_TTL) : String(record.ttl),
+    aliasEndpoint: record.alias_target
+      ? endpointForTarget(record.alias_target.hosted_zone_id, record.zone_id)
+      : "",
+    aliasRegion: "",
     aliasDnsName: record.alias_target ? displayName(record.alias_target.dns_name) : "",
     aliasHostedZoneId: record.alias_target?.hosted_zone_id ?? "",
     evaluateTargetHealth: record.alias_target?.evaluate_target_health ?? false,
@@ -156,6 +173,14 @@ export function draftToInput(draft: RecordDraft): RecordSetInput {
           }
         : null,
   };
+}
+
+/** The flash header after creating records: one is named, several are counted by zone. */
+export function createdRecordsHeader(result: ChangeBatchResult, zoneName: string): string {
+  const [first] = result.record_sets;
+  return result.created === 1 && first
+    ? `${displayName(first.name)} was successfully created.`
+    : `Records for ${zoneName} were successfully created.`;
 }
 
 /** The identifying part of a record, enough for a DELETE change. */

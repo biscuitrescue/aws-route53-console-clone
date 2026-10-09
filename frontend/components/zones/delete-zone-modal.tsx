@@ -3,6 +3,7 @@
 import Alert from "@cloudscape-design/components/alert";
 import Box from "@cloudscape-design/components/box";
 import Button from "@cloudscape-design/components/button";
+import ColumnLayout from "@cloudscape-design/components/column-layout";
 import FormField from "@cloudscape-design/components/form-field";
 import Input from "@cloudscape-design/components/input";
 import Modal from "@cloudscape-design/components/modal";
@@ -83,32 +84,34 @@ export function DeleteZoneModal({
         </Box>
       }
     >
-      <SpaceBetween size="l">
-        <Box>
-          Delete the hosted zone permanently? This action cannot be undone. Your domain might become
-          unavailable on the internet.
-        </Box>
-        {hasOtherRecords && (
-          <Alert type="warning" header={`Take these actions to delete hosted zone ${name}`}>
-            <SpaceBetween size="s">
-              <Box>
-                Complete the following steps to successfully delete this hosted zone. If you
-                don&apos;t complete the steps, the deletion might be blocked by Route 53 service
-                validation.
-              </Box>
-              <ul>
-                <li>
-                  Delete all records in this hosted zone, except the default NS and SOA records.
-                </li>
-              </ul>
-              {showDetailsLink && (
-                <Button href={routes.hostedZone(zone.id)} onFollow={follow}>
-                  Go to hosted zone details
-                </Button>
-              )}
-            </SpaceBetween>
-          </Alert>
-        )}
+      <ColumnLayout borders="horizontal">
+        <SpaceBetween size="l">
+          <Box>
+            Delete the hosted zone permanently? This action cannot be undone. Your domain might
+            become unavailable on the internet.
+          </Box>
+          {hasOtherRecords && (
+            <Alert type="warning" header={`Take these actions to delete hosted zone ${name}`}>
+              <SpaceBetween size="s">
+                <Box>
+                  Complete the following steps to successfully delete this hosted zone. If you
+                  don&apos;t complete the steps, the deletion might be blocked by Route 53 service
+                  validation.
+                </Box>
+                <ul>
+                  <li>
+                    Delete all records in this hosted zone, except the default NS and SOA records.
+                  </li>
+                </ul>
+                {showDetailsLink && (
+                  <Button href={routes.hostedZone(zone.id)} onFollow={follow}>
+                    Go to hosted zone details
+                  </Button>
+                )}
+              </SpaceBetween>
+            </Alert>
+          )}
+        </SpaceBetween>
         <form
           onSubmit={(event) => {
             event.preventDefault();
@@ -132,7 +135,7 @@ export function DeleteZoneModal({
             />
           </FormField>
         </form>
-      </SpaceBetween>
+      </ColumnLayout>
     </Modal>
   );
 }

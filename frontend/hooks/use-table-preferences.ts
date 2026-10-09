@@ -14,12 +14,10 @@ export interface ColumnChoice {
   label: string;
   /** Hidden until the user turns it on in the preferences. */
   hiddenByDefault?: boolean;
-  /** Cannot be hidden. */
-  alwaysVisible?: boolean;
 }
 
 export const PAGE_SIZES = [10, 30, 50, 100];
-const DEFAULT_PAGE_SIZE = 50;
+const DEFAULT_PAGE_SIZE = 100;
 
 /** Table preferences (page size, wrap lines, visible columns) remembered per table. */
 export function useTablePreferences(tableId: string, columns: ColumnChoice[]) {
@@ -27,11 +25,7 @@ export function useTablePreferences(tableId: string, columns: ColumnChoice[]) {
     () => ({
       pageSize: DEFAULT_PAGE_SIZE,
       wrapLines: false,
-      custom: "automatic",
-      contentDisplay: columns.map((column) => ({
-        id: column.id,
-        visible: !column.hiddenByDefault,
-      })),
+      visibleContent: columns.filter((column) => !column.hiddenByDefault).map(({ id }) => id),
     }),
     [columns],
   );
@@ -40,6 +34,13 @@ export function useTablePreferences(tableId: string, columns: ColumnChoice[]) {
     defaults,
   );
   // Preferences saved by an older version may lack newer fields.
-  const preferences = useMemo(() => ({ ...defaults, ...stored }), [defaults, stored]);
+  const preferences = useMemo(
+    () => ({
+      ...defaults,
+      ...stored,
+      visibleContent: stored.visibleContent ?? defaults.visibleContent,
+    }),
+    [defaults, stored],
+  );
   return [preferences, setPreferences] as const;
 }

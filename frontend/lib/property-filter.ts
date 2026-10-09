@@ -16,15 +16,13 @@ const OPERATORS: Record<string, FilterOperator> = {
   "<=": "lte",
 };
 
-export const TEXT_OPERATORS: PropertyFilterProps.ComparisonOperator[] = [
-  ":",
-  "!:",
-  "=",
-  "!=",
-  "^",
-  "!^",
-];
-export const EXACT_OPERATORS: PropertyFilterProps.ComparisonOperator[] = ["=", "!="];
+/**
+ * The console gives each property a single operator, so choosing a property goes straight
+ * to typing its value: text properties match by "contains", choices by "equals". Numeric
+ * properties also offer comparisons.
+ */
+export const CONTAINS_ONLY: PropertyFilterProps.ComparisonOperator[] = [":"];
+export const EQUALS_ONLY: PropertyFilterProps.ComparisonOperator[] = ["="];
 export const NUMBER_OPERATORS: PropertyFilterProps.ComparisonOperator[] = [
   "=",
   "!=",

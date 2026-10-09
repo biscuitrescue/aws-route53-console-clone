@@ -1,0 +1,35 @@
+/* Spacing measured from the console: 12 px between facts of one column, 24 px between the
+   blocks of the first column in the side panel, 56 px between stacked columns. */
+.group {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.block {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.stacked {
+  display: flex;
+  flex-direction: column;
+  gap: 56px;
+  padding-block-start: 13px;
+}
+
+.list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.stacked .list {
+  padding-inline-start: 20px;
+  list-style: disc;
+}
+
+.stacked .list li {
+  padding-block: 2.5px;
+}

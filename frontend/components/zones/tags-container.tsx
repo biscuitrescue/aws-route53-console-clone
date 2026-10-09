@@ -48,7 +48,8 @@ export function TagsContainer({ tags, onChange }: TagsContainerProps) {
         onChange={({ detail }) => onChange(detail.tags)}
         i18nStrings={{
           keyHeader: "Key",
-          valueHeader: "Value - optional",
+          // The editor appends " - optional" to this header itself.
+          valueHeader: "Value",
           keyPlaceholder: "Enter key",
           valuePlaceholder: "Enter value",
           addButton: "Add tag",

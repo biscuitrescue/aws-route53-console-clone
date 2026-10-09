@@ -3,6 +3,7 @@
 import { useCollection } from "@cloudscape-design/collection-hooks";
 import Box from "@cloudscape-design/components/box";
 import Button from "@cloudscape-design/components/button";
+import ColumnLayout from "@cloudscape-design/components/column-layout";
 import Modal from "@cloudscape-design/components/modal";
 import Pagination from "@cloudscape-design/components/pagination";
 import SpaceBetween from "@cloudscape-design/components/space-between";
@@ -84,7 +85,7 @@ export function DeleteRecordsModal({
         </Box>
       }
     >
-      <SpaceBetween size="l">
+      <ColumnLayout borders="horizontal">
         <Box>
           Delete the {several ? "records" : "record"} permanently? This action cannot be undone.
           Your domain might become unavailable on the internet.
@@ -94,6 +95,7 @@ export function DeleteRecordsModal({
           variant="container"
           items={items}
           trackBy="id"
+          resizableColumns
           ariaLabels={{ tableLabel: "Records to delete" }}
           filter={
             <TextFilter
@@ -107,10 +109,11 @@ export function DeleteRecordsModal({
             {
               id: "name",
               header: "Record name",
+              width: 180,
               cell: (record) => displayName(record.name),
               isRowHeader: true,
             },
-            { id: "type", header: "Type", cell: (record) => record.type },
+            { id: "type", header: "Type", width: 160, cell: (record) => record.type },
             {
               id: "value",
               header: "Value/Route traffic to",
@@ -118,7 +121,7 @@ export function DeleteRecordsModal({
             },
           ]}
         />
-      </SpaceBetween>
+      </ColumnLayout>
     </Modal>
   );
 }

@@ -250,11 +250,11 @@
             "required": false,
             "schema": {
               "type": "string",
-              "description": "name, type, description, id, created_by, record_count or created_at",
-              "default": "name",
+              "description": "default (Route 53 order), name, type, description, id, created_by, record_count or created_at",
+              "default": "default",
               "title": "Sort"
             },
-            "description": "name, type, description, id, created_by, record_count or created_at"
+            "description": "default (Route 53 order), name, type, description, id, created_by, record_count or created_at"
           },
           {
             "name": "order",
@@ -475,7 +475,7 @@
           "Hosted zones"
         ],
         "summary": "Edit a hosted zone",
-        "description": "Only the description can be changed after a zone is created.",
+        "description": "The description, the tags and, for a private zone, the VPC associations can be changed after a zone is created. Omitted fields keep their value; the edit is applied as a whole or not at all.",
         "operationId": "update_hosted_zone",
         "parameters": [
           {
@@ -876,11 +876,11 @@
             "required": false,
             "schema": {
               "type": "string",
-              "description": "default (Route 53 order), name, type, ttl, routing_policy, set_identifier, alias or id",
+              "description": "default (Route 53 order), name, type, ttl, routing_policy, differentiator, set_identifier, alias, value, health_check_id, evaluate_target_health or id",
               "default": "default",
               "title": "Sort"
             },
-            "description": "default (Route 53 order), name, type, ttl, routing_policy, set_identifier, alias or id"
+            "description": "default (Route 53 order), name, type, ttl, routing_policy, differentiator, set_identifier, alias, value, health_check_id, evaluate_target_health or id"
           },
           {
             "name": "order",
@@ -2088,16 +2088,51 @@
       "HostedZoneUpdate": {
         "properties": {
           "description": {
-            "type": "string",
-            "maxLength": 256,
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 256
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Description"
+          },
+          "tags": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/Tag"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tags",
+            "description": "Replaces every tag of the zone"
+          },
+          "vpcs": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/VpcAssociation"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Vpcs",
+            "description": "Replaces the VPC associations of a private zone"
           }
         },
         "type": "object",
-        "required": [
-          "description"
-        ],
-        "title": "HostedZoneUpdate"
+        "title": "HostedZoneUpdate",
+        "description": "Partial update; omitted fields keep their current value."
       },
       "ImportSummary": {
         "properties": {

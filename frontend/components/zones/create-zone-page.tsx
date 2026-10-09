@@ -1,6 +1,5 @@
 "use client";
 
-import AttributeEditor from "@cloudscape-design/components/attribute-editor";
 import Button from "@cloudscape-design/components/button";
 import Container from "@cloudscape-design/components/container";
 import ContentLayout from "@cloudscape-design/components/content-layout";
@@ -8,7 +7,6 @@ import Form from "@cloudscape-design/components/form";
 import FormField from "@cloudscape-design/components/form-field";
 import Header from "@cloudscape-design/components/header";
 import Input from "@cloudscape-design/components/input";
-import Select from "@cloudscape-design/components/select";
 import SpaceBetween from "@cloudscape-design/components/space-between";
 import Textarea from "@cloudscape-design/components/textarea";
 import Tiles from "@cloudscape-design/components/tiles";
@@ -21,17 +19,16 @@ import { useNotify } from "@/components/shell/notifications";
 import { useFollow } from "@/hooks/use-follow";
 import { useCreateHostedZone } from "@/hooks/use-hosted-zones";
 import type { VpcAssociation, ZoneType } from "@/lib/api/types";
-import { awsRegions } from "@/lib/aws-regions";
 import { displayName } from "@/lib/format";
 import { routes } from "@/lib/routes";
 
 import { TagsContainer, toApiTags } from "./tags-container";
 import type { EditableTag } from "./tags-container";
+import { EMPTY_VPC, toApiVpcs, vpcsComplete, VpcsContainer } from "./vpcs-container";
 
 export const DESCRIPTION_LIMIT = 256;
 const VALID_CHARACTERS =
   "Valid characters: a-z, 0-9, ! \" # $ % & ' ( ) * + , - / : ; < = > ? @ [ \\ ] ^ _ ` { | } . ~";
-const EMPTY_VPC: VpcAssociation = { region: "", vpc_id: "" };
 
 export function CreateZonePage() {
   const router = useRouter();
@@ -47,18 +44,18 @@ export function CreateZonePage() {
   const [submitted, setSubmitted] = useState(false);
 
   const nameError = submitted && !name.trim() ? "Domain name is empty." : undefined;
-  const vpcsIncomplete =
-    type === "private" && vpcs.some((vpc) => !vpc.region || !vpc.vpc_id.trim());
+  const vpcsIncomplete = type === "private" && !vpcsComplete(vpcs);
 
   const submit = () => {
     setSubmitted(true);
     if (!name.trim() || vpcsIncomplete) return;
+    const done = notify.progress(`Creating hosted zone ${name.trim()}`);
     createZone.mutate(
       {
         name: name.trim(),
         description,
         type,
-        vpcs: type === "private" ? vpcs.map((vpc) => ({ ...vpc, vpc_id: vpc.vpc_id.trim() })) : [],
+        vpcs: type === "private" ? toApiVpcs(vpcs) : [],
         tags: toApiTags(tags),
       },
       {
@@ -70,13 +67,8 @@ export function CreateZonePage() {
           router.push(routes.hostedZone(zone.id));
         },
         onError: notify.error,
+        onSettled: done,
       },
-    );
-  };
-
-  const setVpc = (index: number, change: Partial<VpcAssociation>) => {
-    setVpcs((current) =>
-      current.map((vpc, position) => (position === index ? { ...vpc, ...change } : vpc)),
     );
   };
 
@@ -194,61 +186,7 @@ export function CreateZonePage() {
               </Container>
 
               {type === "private" && (
-                <Container
-                  header={
-                    <Header
-                      variant="h2"
-                      info={<InfoLink topic="zone-type" />}
-                      description="To use this hosted zone to resolve DNS queries for one or more VPCs, choose the VPCs. To associate a VPC with a hosted zone when the VPC was created using a different AWS account, you must use a programmatic method, such as the AWS CLI."
-                    >
-                      VPCs to associate with the hosted zone
-                    </Header>
-                  }
-                >
-                  <AttributeEditor
-                    items={vpcs}
-                    addButtonText="Add VPC"
-                    removeButtonText="Remove VPC"
-                    isItemRemovable={() => vpcs.length > 1}
-                    onAddButtonClick={() => setVpcs((current) => [...current, EMPTY_VPC])}
-                    onRemoveButtonClick={({ detail }) =>
-                      setVpcs((current) =>
-                        current.filter((_vpc, index) => index !== detail.itemIndex),
-                      )
-                    }
-                    definition={[
-                      {
-                        label: "Region",
-                        control: (vpc, index) => (
-                          <Select
-                            placeholder="Choose region"
-                            selectedOption={
-                              awsRegions.find((region) => region.value === vpc.region) ?? null
-                            }
-                            options={awsRegions}
-                            onChange={({ detail }) =>
-                              setVpc(index, { region: detail.selectedOption.value ?? "" })
-                            }
-                          />
-                        ),
-                        errorText: (vpc) =>
-                          submitted && !vpc.region ? "Choose a Region." : undefined,
-                      },
-                      {
-                        label: "VPC ID",
-                        control: (vpc, index) => (
-                          <Input
-                            value={vpc.vpc_id}
-                            placeholder="vpc-0a1b2c3d4e5f67890"
-                            onChange={({ detail }) => setVpc(index, { vpc_id: detail.value })}
-                          />
-                        ),
-                        errorText: (vpc) =>
-                          submitted && !vpc.vpc_id.trim() ? "Enter a VPC ID." : undefined,
-                      },
-                    ]}
-                  />
-                </Container>
+                <VpcsContainer vpcs={vpcs} onChange={setVpcs} showErrors={submitted} />
               )}
 
               <TagsContainer tags={tags} onChange={setTags} />

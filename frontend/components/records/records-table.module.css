@@ -1,0 +1,39 @@
+/* The console puts the Type, Routing policy and Alias selects on the filter's row. The
+   property filter gives way first when the row is narrow; widths are the console's, as is
+   the space it keeps free before the pagination. */
+.filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 10px;
+  padding-inline-end: 27px;
+}
+
+.propertyFilter {
+  flex: 0 1 728px;
+  min-inline-size: 70px;
+}
+
+.type,
+.alias,
+.routing_policy {
+  flex: none;
+}
+
+.type {
+  inline-size: 79px;
+}
+
+.routing_policy {
+  inline-size: 131px;
+}
+
+.alias {
+  inline-size: 82px;
+}
+
+.count {
+  flex: none;
+  padding-block: 6px;
+  white-space: nowrap;
+}

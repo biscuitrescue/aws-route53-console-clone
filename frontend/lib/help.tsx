@@ -40,16 +40,33 @@ export const helpTopics = {
     body: (
       <>
         <p>
-          When you create a hosted zone, Route 53 automatically creates a name server (NS) record
-          and a start of authority (SOA) record for the zone.
+          You create a hosted zone when you want to use Route 53 to route internet traffic for your
+          domain or to route traffic within your VPCs. Then you create records in the hosted zone
+          for the domain name (example.com) and subdomains (such as www.example.com or
+          blog.example.com).
         </p>
         <p>
-          You can create more than one hosted zone with the same name and add different records to
-          each.
+          When you register a domain with Route 53, a public hosted zone is automatically created.
+          You can also create a new hosted zone for a subdomain. Using a separate hosted zone to
+          route internet traffic for a subdomain is sometimes known as &quot;delegating
+          responsibility for a subdomain to a hosted zone&quot; or &quot;delegating a subdomain to
+          other name servers&quot;.
+        </p>
+        <p>
+          When you want to route traffic to your VPCs you create a private hosted zone for your
+          domain and associate a VPC to it. This is sometimes referred to as &quot;private
+          DNS&quot;.
         </p>
       </>
     ),
-    learnMore: [{ text: "Creating a public hosted zone", href: `${DOCS}/CreatingHostedZone.html` }],
+    learnMore: [
+      { text: "Working with public hosted zones", href: `${DOCS}/AboutHZWorkingWith.html` },
+      { text: "Working with private hosted zones", href: `${DOCS}/hosted-zones-private.html` },
+      {
+        text: "How internet traffic is routed to your website or web application",
+        href: `${DOCS}/welcome-dns-service.html`,
+      },
+    ],
   },
   "domain-name": {
     title: "Domain name",
@@ -77,6 +94,37 @@ export const helpTopics = {
         The type specifies whether this is a public hosted zone (for routing traffic on the
         internet) or a private hosted zone (for routing traffic within and among VPCs). You
         can&apos;t change the type after the hosted zone is created.
+      </p>
+    ),
+  },
+  "private-zone-vpcs": {
+    title: "VPCs to associate with the hosted zone",
+    body: (
+      <>
+        <p>
+          A private hosted zone answers DNS queries only from the VPCs that you associate with it.
+          You must associate at least one VPC when you create the hosted zone.
+        </p>
+        <p>
+          This clone does not look VPCs up: enter the ID of any VPC, for example
+          vpc-0a1b2c3d4e5f67890.
+        </p>
+      </>
+    ),
+    learnMore: [
+      { text: "Working with private hosted zones", href: `${DOCS}/hosted-zones-private.html` },
+    ],
+  },
+  "vpc-region": {
+    title: "Region",
+    body: <p>The AWS Region that the VPC was created in.</p>,
+  },
+  "vpc-id": {
+    title: "VPC ID",
+    body: (
+      <p>
+        The ID of the VPC that you want to associate with the hosted zone. A VPC ID is{" "}
+        <code>vpc-</code> followed by 8 or 17 hexadecimal characters.
       </p>
     ),
   },
@@ -233,6 +281,35 @@ export const helpTopics = {
         href: `${DOCS}/resource-record-sets-creating-import.html`,
       },
     ],
+  },
+  dnssec: {
+    title: "DNSSEC signing",
+    body: (
+      <>
+        <p>
+          When you enable DNSSEC signing on a hosted zone, Route 53 cryptographically signs each
+          record in that hosted zone, so that resolvers can verify that DNS responses came from
+          Route 53 and were not tampered with.
+        </p>
+        <p>
+          Route 53 manages the zone-signing key. You manage the key-signing key (KSK), which is
+          based on a customer managed key in AWS Key Management Service.
+        </p>
+      </>
+    ),
+    learnMore: [
+      { text: "Configuring DNSSEC signing", href: `${DOCS}/dns-configuring-dnssec.html` },
+    ],
+  },
+  "accelerated-recovery": {
+    title: "Accelerated recovery",
+    body: (
+      <p>
+        Accelerated recovery lets you continue to make changes to the records of a public hosted
+        zone after an impairment to the US East (N. Virginia) Region, where the Route 53 control
+        plane runs.
+      </p>
+    ),
   },
   "coming-soon": {
     title: "Coming soon",

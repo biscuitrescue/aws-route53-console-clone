@@ -18,7 +18,11 @@ interface Notifier {
   info: (header: string, content?: ReactNode) => void;
   /** Red "Error occurred" flash with the service's detail in parentheses. */
   error: (error: unknown) => void;
-  dismissAll: () => void;
+  /**
+   * Blue flash with a spinner, shown while a zone or its records are being created.
+   * Returns the function that removes it once the request has settled.
+   */
+  progress: (header: string) => () => void;
 }
 
 interface NotificationsValue {
@@ -44,7 +48,11 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const push = useCallback(
-    (item: Omit<FlashbarProps.MessageDefinition, "id" | "dismissible" | "onDismiss">) => {
+    (
+      item: Omit<FlashbarProps.MessageDefinition, "id" | "dismissible" | "onDismiss">,
+      // A completed change answers the errors that came before it, so they leave the stack.
+      { resolvesErrors = false } = {},
+    ) => {
       const id = crypto.randomUUID();
       setItems((current) => [
         {
@@ -54,35 +62,49 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
           dismissLabel: "Dismiss notification",
           onDismiss: () => dismiss(id),
         },
-        ...current,
+        ...(resolvesErrors ? current.filter((earlier) => earlier.type !== "error") : current),
       ]);
+      return id;
     },
     [dismiss],
   );
 
   const notify = useMemo<Notifier>(
     () => ({
-      success: (header, content) => push({ type: "success", header, content }),
+      success: (header, content) =>
+        push({ type: "success", header, content }, { resolvesErrors: true }),
       recordsChanged: (header) =>
-        push({
-          type: "info",
-          header,
-          content: PROPAGATION_NOTE,
-          action: (
-            <Button
-              onClick={() =>
-                push({
-                  type: "success",
-                  header: "Status: INSYNC",
-                  content: "Your changes have propagated to all Route 53 DNS servers.",
-                })
-              }
-            >
-              View status
-            </Button>
-          ),
-        }),
+        push(
+          {
+            type: "info",
+            header,
+            content: PROPAGATION_NOTE,
+            action: (
+              <Button
+                onClick={() =>
+                  push({
+                    type: "success",
+                    header: "Status: INSYNC",
+                    content: "Your changes have propagated to all Route 53 DNS servers.",
+                  })
+                }
+              >
+                View status
+              </Button>
+            ),
+          },
+          { resolvesErrors: true },
+        ),
       info: (header, content) => push({ type: "info", header, content }),
+      progress: (header) => {
+        const id = push({
+          type: "info",
+          loading: true,
+          header,
+          content: "This can take a moment.",
+        });
+        return () => dismiss(id);
+      },
       error: (error) =>
         push({
           type: "error",
@@ -91,15 +113,14 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
             <>
               Please try again later.
               <br />
-              <Box variant="code" color="inherit">
+              <Box variant="code" color="inherit" fontSize="body-m">
                 ({describeError(error)})
               </Box>
             </>
           ),
         }),
-      dismissAll: () => setItems([]),
     }),
-    [push],
+    [push, dismiss],
   );
 
   const value = useMemo(() => ({ items, notify }), [items, notify]);

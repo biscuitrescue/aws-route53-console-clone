@@ -1,5 +1,6 @@
 "use client";
 
+import { useCollection } from "@cloudscape-design/collection-hooks";
 import Alert from "@cloudscape-design/components/alert";
 import Box from "@cloudscape-design/components/box";
 import Button from "@cloudscape-design/components/button";
@@ -10,10 +11,12 @@ import FileUpload from "@cloudscape-design/components/file-upload";
 import Form from "@cloudscape-design/components/form";
 import FormField from "@cloudscape-design/components/form-field";
 import Header from "@cloudscape-design/components/header";
+import Pagination from "@cloudscape-design/components/pagination";
 import SpaceBetween from "@cloudscape-design/components/space-between";
 import StatusIndicator from "@cloudscape-design/components/status-indicator";
 import type { StatusIndicatorProps } from "@cloudscape-design/components/status-indicator";
 import Table from "@cloudscape-design/components/table";
+import TextFilter from "@cloudscape-design/components/text-filter";
 import Textarea from "@cloudscape-design/components/textarea";
 import { useQuery } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
@@ -29,12 +32,14 @@ import { useHostedZone } from "@/hooks/use-hosted-zones";
 import { importZoneFile, useImportZoneFile } from "@/hooks/use-records";
 import type { HostedZone, ImportedRecordSet } from "@/lib/api/types";
 import { displayName, formatNumber } from "@/lib/format";
+import { matchesText } from "@/lib/property-filter";
 import { routes } from "@/lib/routes";
 
 import { ValueLines } from "./value-lines";
 
 const PLACEHOLDER = "subdomain1 0s A 10.0.0.0\nsubdomain2 0s CNAME example.com.";
 const PREVIEW_DELAY_MS = 400;
+const PREVIEW_PAGE_SIZE = 50;
 
 const STATUS: Record<
   ImportedRecordSet["status"],
@@ -71,6 +76,19 @@ function ImportZoneFileForm({ zone }: { zone: HostedZone }) {
 
   const result = content.trim() ? preview.data : undefined;
   const recordSets = result?.record_sets ?? [];
+  const [search, setSearch] = useState("");
+  const term = search.trim().toLowerCase();
+  const matching = term
+    ? recordSets.filter((record) =>
+        [record.name, record.type, ...record.values].some((text) =>
+          text.toLowerCase().includes(term),
+        ),
+      )
+    : recordSets;
+  const previewTable = useCollection<ImportedRecordSet>(matching, {
+    pagination: { pageSize: PREVIEW_PAGE_SIZE },
+    sorting: { defaultState: { sortingColumn: { sortingField: "name" } } },
+  });
   const blocked = result ? result.errors.length > 0 || (result.summary.error ?? 0) > 0 : false;
   const importable = result ? (result.summary.create ?? 0) + (result.summary.replace ?? 0) : 0;
   const emptyError = submitted && !content.trim() ? "Zone file is empty." : undefined;
@@ -84,6 +102,7 @@ function ImportZoneFileForm({ zone }: { zone: HostedZone }) {
   const submit = () => {
     setSubmitted(true);
     if (!content.trim()) return;
+    const done = notify.progress(`Creating record(s) for ${zoneName}`);
     importFile.mutate(
       { content, dryRun: false, replaceExisting },
       {
@@ -92,6 +111,7 @@ function ImportZoneFileForm({ zone }: { zone: HostedZone }) {
           router.push(routes.hostedZone(zone.id));
         },
         onError: notify.error,
+        onSettled: done,
       },
     );
   };
@@ -138,11 +158,15 @@ function ImportZoneFileForm({ zone }: { zone: HostedZone }) {
           }
         >
           <SpaceBetween size="l">
-            <Container>
+            <Container
+              header={
+                <Header variant="h2" description="Paste the contents of your zone file below.">
+                  Zone file
+                </Header>
+              }
+            >
               <SpaceBetween size="l">
                 <FormField
-                  label="Zone file"
-                  description="Paste the contents of your zone file below."
                   constraintText="If the hosted zone already contains records that appear in the zone file, the import process fails, and no records are created. Enter multiple records on separate lines."
                   errorText={emptyError}
                   stretch
@@ -199,9 +223,20 @@ function ImportZoneFileForm({ zone }: { zone: HostedZone }) {
             )}
 
             <Table
+              {...previewTable.collectionProps}
               variant="container"
-              items={recordSets}
+              items={previewTable.items}
               trackBy={(record) => `${record.name} ${record.type}`}
+              filter={
+                <TextFilter
+                  filteringText={search}
+                  filteringPlaceholder="Filter records by property or value"
+                  filteringAriaLabel="Filter the record preview"
+                  countText={term ? matchesText(matching.length) : undefined}
+                  onChange={({ detail }) => setSearch(detail.filteringText)}
+                />
+              }
+              pagination={<Pagination {...previewTable.paginationProps} />}
               loading={preview.isFetching && recordSets.length === 0}
               loadingText="Reading zone file"
               ariaLabels={{ tableLabel: "Record preview" }}
@@ -218,19 +253,27 @@ function ImportZoneFileForm({ zone }: { zone: HostedZone }) {
                 {
                   id: "name",
                   header: "Record name",
+                  sortingField: "name",
                   cell: (record) => displayName(record.name),
                   isRowHeader: true,
                 },
-                { id: "type", header: "Type", cell: (record) => record.type },
+                { id: "type", header: "Type", sortingField: "type", cell: (record) => record.type },
                 {
                   id: "value",
                   header: "Value/Route traffic to",
+                  sortingComparator: (a, b) => a.values.join().localeCompare(b.values.join()),
                   cell: (record) => <ValueLines values={record.values} />,
                 },
-                { id: "ttl", header: "TTL (seconds)", cell: (record) => formatNumber(record.ttl) },
+                {
+                  id: "ttl",
+                  header: "TTL (seconds)",
+                  sortingField: "ttl",
+                  cell: (record) => formatNumber(record.ttl),
+                },
                 {
                   id: "status",
                   header: "Result",
+                  sortingField: "status",
                   cell: (record) => (
                     <>
                       <StatusIndicator type={STATUS[record.status].type}>

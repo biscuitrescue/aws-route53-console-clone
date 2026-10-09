@@ -19,17 +19,18 @@ import { TablePreferencesButton } from "@/components/common/table-preferences";
 import { ConsolePage } from "@/components/shell/console-page";
 import { useFollow } from "@/hooks/use-follow";
 import { useHostedZone, useHostedZones } from "@/hooks/use-hosted-zones";
+import { usePropertyOperatorCompletion } from "@/hooks/use-property-operator-completion";
 import { useShortcut } from "@/hooks/use-shortcuts";
 import { useTablePreferences } from "@/hooks/use-table-preferences";
 import type { ColumnChoice } from "@/hooks/use-table-preferences";
 import type { HostedZoneSummary } from "@/lib/api/types";
 import { displayName, formatNumber, orDash, zoneTypeLabel } from "@/lib/format";
 import {
+  CONTAINS_ONLY,
   EMPTY_QUERY,
-  EXACT_OPERATORS,
+  EQUALS_ONLY,
   matchesText,
   NUMBER_OPERATORS,
-  TEXT_OPERATORS,
   toApiFilters,
 } from "@/lib/property-filter";
 import { pathForConsoleHash, routes } from "@/lib/routes";
@@ -38,8 +39,9 @@ import { DeleteZoneModal } from "./delete-zone-modal";
 import { ZoneDetailsList } from "./zone-details-list";
 
 const COLUMNS: ColumnChoice[] = [
-  { id: "name", label: "Hosted zone name", alwaysVisible: true },
+  { id: "name", label: "Hosted zone name" },
   { id: "type", label: "Type" },
+  { id: "accelerated_recovery", label: "Accelerated recovery", hiddenByDefault: true },
   { id: "created_by", label: "Created by" },
   { id: "record_count", label: "Record count" },
   { id: "description", label: "Description" },
@@ -51,20 +53,29 @@ const FILTERING_PROPERTIES: PropertyFilterProps.FilteringProperty[] = [
     key: "name",
     propertyLabel: "Hosted zone name",
     groupValuesLabel: "Hosted zone name values",
-    operators: TEXT_OPERATORS,
+    operators: CONTAINS_ONLY,
+    defaultOperator: ":",
   },
   {
     key: "type",
     propertyLabel: "Type",
     groupValuesLabel: "Type values",
-    operators: EXACT_OPERATORS,
+    operators: EQUALS_ONLY,
     defaultOperator: "=",
+  },
+  {
+    key: "accelerated_recovery",
+    propertyLabel: "Accelerated recovery",
+    groupValuesLabel: "Accelerated recovery values",
+    operators: CONTAINS_ONLY,
+    defaultOperator: ":",
   },
   {
     key: "created_by",
     propertyLabel: "Created by",
     groupValuesLabel: "Created by values",
-    operators: TEXT_OPERATORS,
+    operators: CONTAINS_ONLY,
+    defaultOperator: ":",
   },
   {
     key: "record_count",
@@ -77,15 +88,20 @@ const FILTERING_PROPERTIES: PropertyFilterProps.FilteringProperty[] = [
     key: "description",
     propertyLabel: "Description",
     groupValuesLabel: "Description values",
-    operators: TEXT_OPERATORS,
+    operators: CONTAINS_ONLY,
+    defaultOperator: ":",
   },
   {
     key: "id",
     propertyLabel: "Hosted zone ID",
     groupValuesLabel: "Hosted zone ID values",
-    operators: TEXT_OPERATORS,
+    operators: CONTAINS_ONLY,
+    defaultOperator: ":",
   },
 ];
+
+/** Accelerated recovery is outside the clone's scope, so every zone has it off. */
+const ACCELERATED_RECOVERY = "Disabled";
 
 const TYPE_OPTIONS: PropertyFilterProps.FilteringOption[] = [
   { propertyKey: "type", value: "Public" },
@@ -105,6 +121,7 @@ export function HostedZonesPage() {
   const searchParams = useSearchParams();
   const filterRef = useRef<PropertyFilterProps.Ref>(null);
   const preferencesRef = useRef<HTMLDivElement>(null);
+  const filterContainer = usePropertyOperatorCompletion(FILTERING_PROPERTIES);
 
   const [preferences, setPreferences] = useTablePreferences("hostedZones", COLUMNS);
   const [query, setQuery] = useState(() => initialQuery(searchParams.get("search")));
@@ -120,7 +137,7 @@ export function HostedZonesPage() {
     if (path) router.replace(path);
   }, [router]);
 
-  const pageSize = preferences.pageSize ?? 50;
+  const pageSize = preferences.pageSize ?? 100;
   const { filters, filterMode } = useMemo(() => toApiFilters(query), [query]);
   const zones = useHostedZones({
     filters,
@@ -132,9 +149,12 @@ export function HostedZonesPage() {
   });
 
   const items = zones.data?.items ?? [];
-  const total = zones.data?.total ?? 0;
+  const matches = zones.data?.total ?? 0;
   const selected = items.find((zone) => zone.id === selectedId) ?? null;
   const filtering = query.tokens.length > 0;
+  // The header counts every zone; "n matches" reports what the filter found.
+  const everyZone = useHostedZones({ page: 1, pageSize: 1 }, { enabled: filtering });
+  const total = filtering ? (everyZone.data?.total ?? matches) : matches;
   const details = useHostedZone(selected?.id ?? "", { enabled: selected !== null });
 
   useShortcut("/", "Focus the filter", () => filterRef.current?.focus());
@@ -160,6 +180,12 @@ export function HostedZonesPage() {
       header: "Type",
       sortingField: "type",
       cell: (zone) => zoneTypeLabel[zone.type],
+    },
+    {
+      id: "accelerated_recovery",
+      header: "Accelerated recovery",
+      width: 200,
+      cell: () => ACCELERATED_RECOVERY,
     },
     {
       id: "created_by",
@@ -240,11 +266,11 @@ export function HostedZonesPage() {
       onSplitPanelToggle={setPanelOpen}
       splitPanel={
         <SplitPanel
-          header={selected ? "Hosted zone details" : "0 hosted zones selected"}
+          header={selected ? "Hosted zone details" : "0 hosted zone selected"}
           closeBehavior="collapse"
         >
           {!selected && <Box>Select a hosted zone to see its details</Box>}
-          {selected && details.data && <ZoneDetailsList zone={details.data} />}
+          {selected && details.data && <ZoneDetailsList zone={details.data} stacked />}
         </SplitPanel>
       }
     >
@@ -256,7 +282,7 @@ export function HostedZonesPage() {
         trackBy="id"
         items={items}
         columnDefinitions={columnDefinitions}
-        columnDisplay={preferences.contentDisplay}
+        visibleColumns={preferences.visibleContent}
         wrapLines={preferences.wrapLines}
         loading={zones.isPending}
         loadingText="Loading hosted zones"
@@ -325,23 +351,26 @@ export function HostedZonesPage() {
           </Header>
         }
         filter={
-          <PropertyFilter
-            ref={filterRef}
-            query={query}
-            onChange={({ detail }) => {
-              setQuery(detail);
-              setPage(1);
-            }}
-            filteringProperties={FILTERING_PROPERTIES}
-            filteringOptions={[
-              ...TYPE_OPTIONS,
-              ...items.map((zone) => ({ propertyKey: "name", value: displayName(zone.name) })),
-            ]}
-            filteringPlaceholder="Filter records by property or value"
-            filteringAriaLabel="Filter records by property or value"
-            countText={filtering && zones.data ? matchesText(total) : undefined}
-            expandToViewport
-          />
+          <div ref={filterContainer}>
+            <PropertyFilter
+              ref={filterRef}
+              query={query}
+              onChange={({ detail }) => {
+                setQuery(detail);
+                setPage(1);
+              }}
+              filteringProperties={FILTERING_PROPERTIES}
+              filteringOptions={[
+                ...TYPE_OPTIONS,
+                { propertyKey: "accelerated_recovery", value: ACCELERATED_RECOVERY },
+                ...items.map((zone) => ({ propertyKey: "name", value: displayName(zone.name) })),
+              ]}
+              filteringPlaceholder="Filter records by property or value"
+              filteringAriaLabel="Filter records by property or value"
+              countText={filtering && zones.data ? matchesText(matches) : undefined}
+              expandToViewport
+            />
+          </div>
         }
         pagination={
           <Pagination

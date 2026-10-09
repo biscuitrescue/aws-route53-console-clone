@@ -37,7 +37,7 @@ export function TablePreferencesButton({
       customPreference={(value, setValue) => (
         <FormField label="Search mode">
           <RadioGroup
-            value={value ?? "automatic"}
+            value={value ?? null}
             onChange={({ detail }) => setValue(detail.value as SearchMode)}
             items={[
               {
@@ -62,9 +62,11 @@ export function TablePreferencesButton({
           />
         </FormField>
       )}
-      contentDisplayPreference={{
+      visibleContentPreference={{
         title: "Select visible columns",
-        options: columns.map(({ id, label, alwaysVisible }) => ({ id, label, alwaysVisible })),
+        options: [
+          { label: "Properties", options: columns.map(({ id, label }) => ({ id, label })) },
+        ],
       }}
     />
   );

@@ -14,12 +14,22 @@ import { ValueLines } from "./value-lines";
 const PARAMS = { page: 1, pageSize: 100 };
 
 /** The collapsed "View existing records" list under the create-record form. */
-export function ExistingRecords({ zone }: { zone: HostedZone }) {
+export function ExistingRecords({ zone, title }: { zone: HostedZone; title?: string }) {
   const records = useRecords(zone.id, PARAMS);
   return (
     <ExpandableSection
-      headerText="View existing records"
-      headerDescription={`The following table lists the existing records in ${displayName(zone.name)}.`}
+      headerText={
+        title ?? (
+          <Box variant="span" fontSize="heading-l" fontWeight="normal">
+            View existing records
+          </Box>
+        )
+      }
+      headerDescription={
+        title
+          ? undefined
+          : `The following table lists the existing records in ${displayName(zone.name)}.`
+      }
     >
       <Table
         variant="container"

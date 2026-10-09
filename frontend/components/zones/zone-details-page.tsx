@@ -4,15 +4,11 @@ import Badge from "@cloudscape-design/components/badge";
 import Box from "@cloudscape-design/components/box";
 import Button from "@cloudscape-design/components/button";
 import ButtonDropdown from "@cloudscape-design/components/button-dropdown";
-import ColumnLayout from "@cloudscape-design/components/column-layout";
-import Container from "@cloudscape-design/components/container";
 import ContentLayout from "@cloudscape-design/components/content-layout";
 import ExpandableSection from "@cloudscape-design/components/expandable-section";
 import Header from "@cloudscape-design/components/header";
 import SpaceBetween from "@cloudscape-design/components/space-between";
 import SplitPanel from "@cloudscape-design/components/split-panel";
-import StatusIndicator from "@cloudscape-design/components/status-indicator";
-import Table from "@cloudscape-design/components/table";
 import Tabs from "@cloudscape-design/components/tabs";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
@@ -32,89 +28,8 @@ import { displayName, formatNumber, zoneTypeLabel } from "@/lib/format";
 import { routes } from "@/lib/routes";
 
 import { DeleteZoneModal } from "./delete-zone-modal";
-import { zoneDetailItems } from "./zone-details-list";
-
-function TagsTab({ zone }: { zone: HostedZone }) {
-  const follow = useFollow();
-  return (
-    <Table
-      variant="container"
-      items={zone.tags}
-      trackBy="key"
-      header={
-        <Header
-          variant="h2"
-          actions={
-            <Button href={routes.editHostedZone(zone.id)} onFollow={follow}>
-              Manage tags
-            </Button>
-          }
-        >
-          Tags
-        </Header>
-      }
-      columnDefinitions={[
-        { id: "key", header: "Key", cell: (tag) => tag.key, isRowHeader: true },
-        { id: "value", header: "Value", cell: (tag) => tag.value || "-" },
-      ]}
-      empty={
-        <Box textAlign="center" color="inherit" padding={{ vertical: "l" }}>
-          <b>No tags</b>
-          <Box variant="p" color="inherit">
-            No tags associated with the resource.
-          </Box>
-        </Box>
-      }
-    />
-  );
-}
-
-function DnssecTab() {
-  return (
-    <Container
-      header={
-        <Header variant="h2" actions={<Button disabled>Enable DNSSEC signing</Button>}>
-          DNSSEC signing
-        </Header>
-      }
-    >
-      <SpaceBetween size="m">
-        <div>
-          <Box variant="awsui-key-label">DNSSEC signing status</Box>
-          <StatusIndicator type="stopped">Not signing</StatusIndicator>
-        </div>
-        <Box>
-          <b>You have not enabled DNSSEC signing for this hosted zone</b>
-        </Box>
-        <Box color="text-body-secondary">DNSSEC signing is coming soon in this clone.</Box>
-      </SpaceBetween>
-    </Container>
-  );
-}
-
-function AcceleratedRecoveryTab() {
-  return (
-    <Container
-      header={
-        <Header
-          variant="h2"
-          actions={<Button disabled>Enable</Button>}
-          description="Enable the accelerated recovery option to ensure that you can continue to make changes to your public DNS records after an impairment to US East (N. Virginia)."
-        >
-          Accelerated recovery
-        </Header>
-      }
-    >
-      <SpaceBetween size="m">
-        <div>
-          <Box variant="awsui-key-label">Status</Box>
-          <StatusIndicator type="stopped">Disabled</StatusIndicator>
-        </div>
-        <Box color="text-body-secondary">Accelerated recovery is coming soon in this clone.</Box>
-      </SpaceBetween>
-    </Container>
-  );
-}
+import { ZoneDetailsList } from "./zone-details-list";
+import { AcceleratedRecoveryTab, DnssecTab, TagsTab } from "./zone-tabs";
 
 function ZoneDetails({ zone }: { zone: HostedZone }) {
   const router = useRouter();
@@ -158,24 +73,31 @@ function ZoneDetails({ zone }: { zone: HostedZone }) {
         { text: name, href: routes.hostedZone(zone.id) },
       ]}
       splitPanel={
-        <SplitPanel header={panelHeader} closeBehavior="collapse">
-          {selected.length === 0 && <Box>Select a record to see its details</Box>}
-          {single && !editing && (
-            <RecordDetails record={single} onEdit={() => setEditingId(single.id)} />
-          )}
-          {single && editing && (
-            <EditRecordForm
-              key={single.id}
-              zone={zone}
-              record={single}
-              onClose={() => setEditingId(null)}
-              onSaved={() => changeSelection([])}
-            />
-          )}
-          {selected.length > 1 && (
-            <BulkTtlForm zoneId={zone.id} records={selected} onSaved={() => changeSelection([])} />
-          )}
-        </SplitPanel>
+        // Record details belong to the Records tab; the other tabs have no split panel.
+        tab === "records" && (
+          <SplitPanel header={panelHeader} closeBehavior="collapse">
+            {selected.length === 0 && <Box>Select a record to see its details</Box>}
+            {single && !editing && (
+              <RecordDetails record={single} onEdit={() => setEditingId(single.id)} />
+            )}
+            {single && editing && (
+              <EditRecordForm
+                key={single.id}
+                zone={zone}
+                record={single}
+                onClose={() => setEditingId(null)}
+                onSaved={() => changeSelection([])}
+              />
+            )}
+            {selected.length > 1 && (
+              <BulkTtlForm
+                zoneId={zone.id}
+                records={selected}
+                onSaved={() => changeSelection([])}
+              />
+            )}
+          </SplitPanel>
+        )
       }
     >
       <ContentLayout
@@ -216,14 +138,7 @@ function ZoneDetails({ zone }: { zone: HostedZone }) {
               </Button>
             }
           >
-            <ColumnLayout columns={3} variant="text-grid">
-              {zoneDetailItems(zone).map((item) => (
-                <div key={item.label}>
-                  <Box variant="awsui-key-label">{item.label}</Box>
-                  <div>{item.value}</div>
-                </div>
-              ))}
-            </ColumnLayout>
+            <ZoneDetailsList zone={zone} />
           </ExpandableSection>
 
           <Tabs

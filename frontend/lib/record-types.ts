@@ -56,6 +56,73 @@ export const soaType: RecordTypeInfo = {
   placeholder: "ns1.amazon.com. hostmaster.amazon.com. 1 7200 900 1209600 86400",
 };
 
+const UNSUPPORTED = "Not supported in this clone";
+
+/**
+ * Types the console also lists. The clone does not store them, so the select shows them
+ * disabled rather than leaving them out.
+ */
+const unsupportedRecordTypes = [
+  { value: "SPF", label: "SPF – Not recommended" },
+  { value: "NAPTR", label: "NAPTR – Used by DDDS applications" },
+  {
+    value: "DS",
+    label: "DS - Delegation Signer, used to establish a chain of trust for DNSSEC",
+  },
+  {
+    value: "TLSA",
+    label:
+      "TLSA - Associates a TLS server certificate or public key with the domain name. DNSSEC required.",
+  },
+  {
+    value: "SSHFP",
+    label: "SSHFP - Specifies the SSH key fingerprint and algorithm. DNSSEC required.",
+  },
+  {
+    value: "HTTPS",
+    label:
+      "HTTPS - Provides connection optimization details like protocols, ports, and endpoints for efficient client-service communication.",
+  },
+  {
+    value: "SVCB",
+    label: "SVCB - Delivers extensible configuration information for accessing service endpoints.",
+  },
+];
+
+const TYPE_ORDER = [
+  "A",
+  "AAAA",
+  "CNAME",
+  "MX",
+  "TXT",
+  "PTR",
+  "SRV",
+  "SPF",
+  "NAPTR",
+  "CAA",
+  "NS",
+  "DS",
+  "TLSA",
+  "SSHFP",
+  "HTTPS",
+  "SVCB",
+];
+
+interface SelectOption {
+  value: string;
+  label: string;
+  disabled?: boolean;
+  disabledReason?: string;
+}
+
+/** The "Record type" select: every type the console lists, in its order. */
+export const recordTypeOptions: SelectOption[] = TYPE_ORDER.flatMap((value): SelectOption[] => {
+  const supported = recordTypes.find((type) => type.value === value);
+  if (supported) return [{ value, label: supported.label }];
+  const other = unsupportedRecordTypes.find((type) => type.value === value);
+  return other ? [{ ...other, disabled: true, disabledReason: UNSUPPORTED }] : [];
+});
+
 export function recordTypeInfo(type: RecordType): RecordTypeInfo {
   return recordTypes.find((candidate) => candidate.value === type) ?? soaType;
 }
@@ -89,6 +156,17 @@ export const routingPolicies: RoutingPolicyInfo[] = [
   { value: "latency", label: "Latency", shortLabel: "Latency" },
   { value: "failover", label: "Failover", shortLabel: "Failover" },
   { value: "multivalue", label: "Multivalue answer", shortLabel: "Multivalue answer" },
+];
+
+/** The "Routing policy" select, ending with the two policies the clone does not implement. */
+export const routingPolicyOptions: SelectOption[] = [
+  ...routingPolicies.map(({ value, label }) => ({ value, label })),
+  ...["IP-based", "Geoproximity"].map((label) => ({
+    value: label,
+    label,
+    disabled: true,
+    disabledReason: UNSUPPORTED,
+  })),
 ];
 
 export const TTL_PRESETS = [
