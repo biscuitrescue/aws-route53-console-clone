@@ -76,6 +76,16 @@ export function AssistantTile() {
   );
 }
 
+/** The magnifier of the search button that replaces the search field in a narrow window. */
+export function SearchGlyph() {
+  return (
+    <Glyph viewBox="0 0 16 16" size={20}>
+      <circle cx="7" cy="7" r="5" strokeWidth="2" />
+      <line x1="15" y1="15" x2="10.5" y2="10.5" strokeWidth="2" />
+    </Glyph>
+  );
+}
+
 /** Nine squares: the services menu. */
 export function ServicesGlyph() {
   return (

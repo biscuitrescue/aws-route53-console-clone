@@ -306,10 +306,8 @@ const VISUAL_MODES: { mode: VisualMode; label: string; icon: ReactNode }[] = [
 /** The console's account pages, which the clone mocks. */
 const ACCOUNT_PAGES = ["Projects", "Team", "Billing", "Profile"];
 
-/** Account IDs are shown in groups of four, as AWS prints them. */
-function formatAccountId(accountId: string): string {
-  return accountId.replace(/(\d{4})(?=\d)/g, "$1-");
-}
+/** The plan status the console shows for a free-plan account. There is no billing here. */
+const PLAN_STATUS = { credits: "$100 USD", days: "183 days" };
 
 export function AccountMenu() {
   const router = useRouter();
@@ -363,15 +361,24 @@ export function AccountMenu() {
         <div className={`${styles.menu} ${styles.accountMenu}`} role="menu" aria-label="Account">
           {mocked(account)}
           <div className={styles.accountSummary}>
-            <span>Account</span>
+            <span>Free plan status</span>
             <div>
               <div>
-                <span>Account ID</span>
-                <span>{user ? formatAccountId(user.account_id) : ""}</span>
+                <span>Credits remaining</span>
+                <button
+                  type="button"
+                  aria-label="Credits remaining"
+                  onClick={() => {
+                    close();
+                    notAvailable("Billing");
+                  }}
+                >
+                  {PLAN_STATUS.credits}
+                </button>
               </div>
               <div>
-                <span>Signed in as</span>
-                <span>{user?.email}</span>
+                <span>Days remaining</span>
+                <span>{PLAN_STATUS.days}</span>
               </div>
             </div>
           </div>

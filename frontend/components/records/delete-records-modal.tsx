@@ -86,7 +86,7 @@ export function DeleteRecordsModal({
       }
     >
       <ColumnLayout borders="horizontal">
-        <Box>
+        <Box margin={{ top: "m", bottom: "s" }}>
           Delete the {several ? "records" : "record"} permanently? This action cannot be undone.
           Your domain might become unavailable on the internet.
         </Box>
@@ -109,11 +109,11 @@ export function DeleteRecordsModal({
             {
               id: "name",
               header: "Record name",
-              width: 180,
+              width: 164,
               cell: (record) => displayName(record.name),
               isRowHeader: true,
             },
-            { id: "type", header: "Type", width: 160, cell: (record) => record.type },
+            { id: "type", header: "Type", width: 164, cell: (record) => record.type },
             {
               id: "value",
               header: "Value/Route traffic to",

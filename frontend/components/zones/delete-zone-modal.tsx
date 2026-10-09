@@ -85,24 +85,24 @@ export function DeleteZoneModal({
       }
     >
       <ColumnLayout borders="horizontal">
-        <SpaceBetween size="l">
-          <Box>
+        <SpaceBetween size="xl">
+          <Box margin={{ top: "m" }}>
             Delete the hosted zone permanently? This action cannot be undone. Your domain might
             become unavailable on the internet.
           </Box>
           {hasOtherRecords && (
             <Alert type="warning" header={`Take these actions to delete hosted zone ${name}`}>
               <SpaceBetween size="s">
-                <Box>
+                <Box margin={{ top: "m" }}>
                   Complete the following steps to successfully delete this hosted zone. If you
                   don&apos;t complete the steps, the deletion might be blocked by Route 53 service
                   validation.
+                  <ul style={{ marginBlockEnd: 0 }}>
+                    <li>
+                      Delete all records in this hosted zone, except the default NS and SOA records.
+                    </li>
+                  </ul>
                 </Box>
-                <ul>
-                  <li>
-                    Delete all records in this hosted zone, except the default NS and SOA records.
-                  </li>
-                </ul>
                 {showDetailsLink && (
                   <Button href={routes.hostedZone(zone.id)} onFollow={follow}>
                     Go to hosted zone details
@@ -118,22 +118,24 @@ export function DeleteZoneModal({
             submit();
           }}
         >
-          <FormField
-            label={
-              <>
-                To confirm that you want to delete the hosted zone, enter <i>{CONFIRMATION}</i> in
-                the field.
-              </>
-            }
-          >
-            <Input
-              value={confirmation}
-              placeholder={CONFIRMATION}
-              ariaLabel={`Type ${CONFIRMATION} to confirm`}
-              onChange={({ detail }) => setConfirmation(detail.value)}
-              autoFocus
-            />
-          </FormField>
+          <Box margin={{ top: "xs" }}>
+            <FormField
+              label={
+                <>
+                  To confirm that you want to delete the hosted zone, enter <i>{CONFIRMATION}</i> in
+                  the field.
+                </>
+              }
+            >
+              <Input
+                value={confirmation}
+                placeholder={CONFIRMATION}
+                ariaLabel={`Type ${CONFIRMATION} to confirm`}
+                onChange={({ detail }) => setConfirmation(detail.value)}
+                autoFocus
+              />
+            </FormField>
+          </Box>
         </form>
       </ColumnLayout>
     </Modal>

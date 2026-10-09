@@ -23,6 +23,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import { PageLoading, ZoneLoadError } from "@/components/common/page-state";
+import { TablePreferencesButton } from "@/components/common/table-preferences";
 import { ConsolePage } from "@/components/shell/console-page";
 import { InfoLink } from "@/components/shell/help-context";
 import { useNotify } from "@/components/shell/notifications";
@@ -30,6 +31,8 @@ import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { useFollow } from "@/hooks/use-follow";
 import { useHostedZone } from "@/hooks/use-hosted-zones";
 import { importZoneFile, useImportZoneFile } from "@/hooks/use-records";
+import { useTablePreferences } from "@/hooks/use-table-preferences";
+import type { ColumnChoice } from "@/hooks/use-table-preferences";
 import type { HostedZone, ImportedRecordSet } from "@/lib/api/types";
 import { displayName, formatNumber } from "@/lib/format";
 import { matchesText } from "@/lib/property-filter";
@@ -39,7 +42,14 @@ import { ValueLines } from "./value-lines";
 
 const PLACEHOLDER = "subdomain1 0s A 10.0.0.0\nsubdomain2 0s CNAME example.com.";
 const PREVIEW_DELAY_MS = 400;
-const PREVIEW_PAGE_SIZE = 50;
+
+const PREVIEW_COLUMNS: ColumnChoice[] = [
+  { id: "name", label: "Record name" },
+  { id: "type", label: "Type" },
+  { id: "value", label: "Value/Route traffic to" },
+  { id: "ttl", label: "TTL (seconds)" },
+  { id: "status", label: "Result" },
+];
 
 const STATUS: Record<
   ImportedRecordSet["status"],
@@ -85,8 +95,9 @@ function ImportZoneFileForm({ zone }: { zone: HostedZone }) {
         ),
       )
     : recordSets;
+  const [preferences, setPreferences] = useTablePreferences("import-preview", PREVIEW_COLUMNS);
   const previewTable = useCollection<ImportedRecordSet>(matching, {
-    pagination: { pageSize: PREVIEW_PAGE_SIZE },
+    pagination: { pageSize: preferences.pageSize },
     sorting: { defaultState: { sortingColumn: { sortingField: "name" } } },
   });
   const blocked = result ? result.errors.length > 0 || (result.summary.error ?? 0) > 0 : false;
@@ -240,6 +251,15 @@ function ImportZoneFileForm({ zone }: { zone: HostedZone }) {
                 />
               }
               pagination={<Pagination {...previewTable.paginationProps} />}
+              preferences={
+                <TablePreferencesButton
+                  columns={PREVIEW_COLUMNS}
+                  preferences={preferences}
+                  onConfirm={setPreferences}
+                />
+              }
+              visibleColumns={preferences.visibleContent}
+              wrapLines={preferences.wrapLines}
               loading={preview.isFetching && recordSets.length === 0}
               loadingText="Reading zone file"
               ariaLabels={{ tableLabel: "Record preview" }}

@@ -32,6 +32,7 @@ import {
 import type { RecordDraft, RecordErrors } from "@/lib/record-draft";
 import { routes } from "@/lib/routes";
 
+import styles from "./create-record-page.module.css";
 import { ExistingRecords } from "./existing-records";
 import { RecordFields } from "./record-fields";
 import { RecordWizard } from "./record-wizard";
@@ -176,7 +177,7 @@ function CreateRecordForm({ zone }: { zone: HostedZone }) {
               >
                 <ColumnLayout borders="horizontal">
                   {drafts.map((draft, index) => (
-                    <div key={draft.key} data-record-index={index}>
+                    <div key={draft.key} className={styles.record} data-record-index={index}>
                       <ExpandableSection
                         defaultExpanded
                         headerText={

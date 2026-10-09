@@ -58,7 +58,8 @@ becomes "Ask Amazon Q" (S08).
 - **Help** (S08): "Support", then Support Center, re:Post, Documentation, Training,
   Getting Started Resource Center, "Send feedback". The clone adds Keyboard shortcuts and
   API reference in a group of their own.
-- **Account** (S03, S09): account name, a summary block, Switch project, Projects, Team,
+- **Account** (S03, S09): account name, a summary block ("Free plan status": "Credits
+  remaining" with the amount as a link, "Days remaining"), Switch project, Projects, Team,
   Billing, Profile, Language, Visual mode (monitor, sun, moon icons; the active one is
   blue), "Sign out of {account}".
 - First tab stop: "Skip to Main Content" (D01).
@@ -270,7 +271,7 @@ Breadcrumbs end in "Import zone file". Header + Info; "You can create records fo
 zone file below."; textarea; constraint "If the hosted zone already contains records that
 appear in the zone file, the import process fails, and no records are created. Enter
 multiple records on separate lines." "Zone file" is the container's header. Table **Record
-preview for {zone} (n)**, with a filter, pagination and sortable columns, and "Route 53
+preview for {zone} (n)**, with a filter, pagination, a preferences button and sortable columns, and "Route 53
 creates the following records when you choose Import zone file. If you edit the contents of
 the zone file above, the table reflects your changes."; columns Record name, Type,
 Value/Route traffic to, TTL (seconds); empty text "This table displays records based on the
@@ -286,8 +287,9 @@ type.", tiles Root user / IAM user, Email address, Next (orange, full width), di
 ## 12. Dark mode and narrow layout (S48–S53, D12, V12)
 
 Dark is Cloudscape's dark mode (`#161d26` surfaces, `#c6c6cd` text); primary buttons stay
-orange. At 800 px the header's search folds into a button and the account button shows
-only the user; the footer takes two rows; page actions wrap under the title; the side split
+orange. At 800 px the header's search folds into a button (a 20 px magnifier with a
+divider after it) while the account button keeps both of its lines, as it does at 688 and
+950 px; the footer takes two rows; page actions wrap under the title; the side split
 panel moves to the bottom; the record filter shrinks and its selects stay beside it; the table
 scrolls horizontally with the sticky scrollbar (S52, S53).
 
@@ -300,7 +302,7 @@ scrolls horizontally with the sticky scrollbar (S52, S53).
 | The sign-in page is one card with email and password, shows the sign-in credentials and says it is a clone that is not affiliated with AWS. No user-type tiles, "Next" step or AWS legal text. | Authentication is mocked, and a public look-alike of the AWS sign-in page must not be mistakable for the real one. |
 | The footer's copyright line names the clone, and Privacy, Terms and Cookie preferences open a note about the clone. | Same reason; there is no legal entity behind the clone. |
 | Amazon Q, CloudShell, Agent Toolkit, Language, Switch project, Projects, Team, Billing, Profile and Notification center answer with a "not available in this clone" notice. | They belong to the AWS console, not to Route 53; the brief allows mocking them. |
-| The account menu shows the account's ID and user instead of plan status and credits. | There is no billing. |
+| The account menu's plan status always reads "$100 USD" and "183 days", the values in the capture, and the amount opens the "not available" notice. | There is no billing. |
 | The IP-based and Geoproximity routing policies are listed but disabled. | They depend on CIDR collections and on geographic coordinates or AWS Regions with a bias, neither of which the clone models. |
 | The placeholders of the Value field for SPF, NAPTR, DS, TLSA, SSHFP, HTTPS and SVCB are examples in each type's format, not the console's wording. | Those seven dropdown entries were captured (S33), their placeholders were not. |
 | Alias targets other than a record of the same zone are entered as a DNS name and hosted zone ID. | The clone has no AWS resources to list. |

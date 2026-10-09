@@ -11,7 +11,7 @@ import { displayName } from "@/lib/format";
 import { routes } from "@/lib/routes";
 
 import styles from "./global-header.module.css";
-import { AssistantGlyph, AssistantTile } from "./header-icons";
+import { AssistantGlyph, AssistantTile, SearchGlyph } from "./header-icons";
 import { AccountMenu, HelpMenu, NotificationsMenu, ServicesMenu } from "./header-menus";
 import { Logo } from "./logo";
 import { useNotify } from "./notifications";
@@ -66,7 +66,7 @@ function Search({ onAskAssistant }: { onAskAssistant: () => void }) {
     <>
       <button
         type="button"
-        className={`${styles.iconButton} ${styles.searchToggle}`}
+        className={`${styles.iconButton} ${styles.wide} ${styles.searchToggle}`}
         aria-label="Search"
         onClick={() => {
           setUnfolded(true);
@@ -74,8 +74,9 @@ function Search({ onAskAssistant }: { onAskAssistant: () => void }) {
           requestAnimationFrame(() => input.current?.focus());
         }}
       >
-        <Icon name="search" />
+        <SearchGlyph />
       </button>
+      <span className={`${styles.divider} ${styles.searchDivider}`} />
       <form
         ref={form}
         className={`${styles.search} ${unfolded ? styles.unfolded : ""}`}

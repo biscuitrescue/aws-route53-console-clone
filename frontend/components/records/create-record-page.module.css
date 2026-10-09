@@ -1,0 +1,8 @@
+/* Cloudscape rules off the heading of an expandable section that has actions and keeps
+   them 4 px from its edge. In the console a record's heading has no rule (records are
+   separated by the one between them) and its Delete button ends flush with the fields.
+   Cloudscape's own selectors carry the weight of an ID, hence `!important`. */
+.record [class*="awsui_wrapper-default"] {
+  border-block-end-color: transparent !important;
+  padding-inline-end: 0 !important;
+}

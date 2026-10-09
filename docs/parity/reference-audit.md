@@ -52,7 +52,9 @@ Found by comparing, then fixed:
   bell and help buttons did nothing; the account button showed the wrong line order and
   caret; the search field only worked on Enter. All rebuilt from `dom/raw/hosted-zones-header.html`
   and S03, S08, S09, S39: real mark, services panel, help menu, notifications panel, account
-  menu, live search results, "Skip to Main Content".
+  menu, live search results, "Skip to Main Content". A later pass found the mark drawn in
+  the bar's grey instead of white (a rule for links outranked the mark's own colour) and
+  gave the account menu the console's "Free plan status" block in place of the account ID.
 - **Footer.** Showed "Keyboard shortcuts", "API reference" and "Built with Cloudscape".
   Now CloudShell, Agent Toolkit for AWS, Feedback, Language, copyright, Privacy, Terms,
   Cookie preferences, at the console's positions; it wraps to two rows when narrow (S52).
@@ -71,18 +73,24 @@ Found by comparing, then fixed:
 - **Edit hosted zone.** Facts stacked, not in four columns; "Value - optional" header no
   longer doubled (S21). VPC associations of a private zone can now be edited.
 - **Delete dialogs.** Divider between the warning and the confirmation field (S22); column
-  widths of the record list (S41).
+  widths of the record list (S41). A later pass measured the rows of both dialogs against
+  S22 and S41 and moved the text 15 px further from the title, the warning's text 15 px
+  further from its heading and the confirmation field 9 px further from the divider; the
+  record list's columns are 164 px, so "Value/Route traffic to" is no longer cut off.
 - **Create record.** Per-record Delete button and dividers were missing (S36); "Record n"
   and "View existing records" heading sizes (S32); value field four rows high (S32); all 16
   record types and 8 routing policies listed (S33, S34); alias "Choose endpoint" and "Choose
   Region" selects (S35); the creation-method explainer shows on the first visit only (S32
   against S33); new record forms take focus (S36); in-progress flash (S38); the wizard (S37).
-- **Import zone file.** "Zone file" container header; filter, sorting and pagination on the
-  preview (S42).
+  A later pass removed a rule under each "Record n" heading that the console does not have
+  (its only rule is the one between records) and moved the Delete button 4 px to the edge.
+- **Import zone file.** "Zone file" container header; filter, sorting, pagination and the
+  preferences button on the preview (S42).
 - **Errors.** Detail line of the red flash at the console's size (S19, S23); errors leave
   the stack once a later action succeeds (S20).
-- **Narrow layout.** Search folds into a button, the account button shows one line, the
-  record filter shrinks and its selects stay on its row (S52, S53). A later pass found
+- **Narrow layout.** Search folds into a button, the account button keeps its two lines
+  (an earlier pass wrongly reduced it to the user's line; S52 and S53 show both at 688, 800
+  and 950 px), the record filter shrinks and its selects stay on its row (S52, S53). A later pass found
   that the row still wrapped whenever the content was narrower than at 1920 px with the
   navigation closed, including at 1920 px with the navigation open: a flex row wraps as
   soon as its items' bases do not fit, before any of them shrinks. The row no longer

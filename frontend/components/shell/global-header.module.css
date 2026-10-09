@@ -53,7 +53,8 @@
   inset-block-start: 8px;
 }
 
-.logo {
+/* Named with the header so that it outranks the inherited colour of links above. */
+.header .logo {
   display: flex;
   align-items: center;
   box-sizing: border-box;
@@ -533,8 +534,22 @@
 .accountSummary > div > div {
   display: flex;
   flex-direction: column;
+  align-items: flex-start;
   min-inline-size: 0;
+  color: #a4a4ad;
   overflow-wrap: anywhere;
+}
+
+.accountSummary button {
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: #42b4ff;
+  font-size: inherit;
+  line-height: inherit;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
 }
 
 .accountSummary > div > div + div {
@@ -576,7 +591,8 @@
   color: #42b4ff;
 }
 
-.searchToggle {
+.searchToggle,
+.searchDivider {
   display: none;
 }
 
@@ -599,14 +615,14 @@
   .searchToggle {
     display: inline-flex;
     margin-inline-start: auto;
+    color: #ebebf0;
+  }
+
+  .searchDivider {
+    display: block;
   }
 
   .spacer {
-    display: none;
-  }
-
-  /* Only the user is named when space is short, as in the console. */
-  .accountName {
     display: none;
   }
 
@@ -618,8 +634,13 @@
   }
 }
 
-/* On a phone the user's name is cut short instead of pushing the bar past the screen. */
+/* On a phone, which the console was not captured on, only the user is named, cut short
+   instead of pushing the bar past the screen. */
 @media (max-width: 560px) {
+  .accountName {
+    display: none;
+  }
+
   .menuAnchor:has(> .accountButton) {
     flex: 0 1 auto;
     min-inline-size: 0;
