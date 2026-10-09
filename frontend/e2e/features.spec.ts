@@ -351,6 +351,27 @@ test("the records filter and its selects share one row as the page narrows", asy
     page.getByRole("button", { name: "Filter by alias" }),
   ];
 
+  /** What is wrong with the filter row right now, or "none". */
+  const rowProblem = async (): Promise<string> => {
+    const boxes = [];
+    for (const control of controls()) {
+      const box = await control.boundingBox();
+      if (!box) return "a control is not visible";
+      boxes.push(box);
+    }
+    const centres = boxes.map((box) => box.y + box.height / 2);
+    if (Math.max(...centres) - Math.min(...centres) >= 4) return "the controls are on two rows";
+    // Left to right in the console's order, none overlapping the next.
+    for (let index = 1; index < boxes.length; index++) {
+      if (boxes[index].x < boxes[index - 1].x + boxes[index - 1].width)
+        return "the controls overlap or are out of order";
+    }
+    const fits = await page.evaluate(
+      () => document.documentElement.scrollWidth <= document.documentElement.clientWidth,
+    );
+    return fits ? "none" : "the page scrolls sideways";
+  };
+
   /** Open or close the side navigation, whatever state the page chose for this width. */
   const setNavigation = async (open: boolean) => {
     const isOpen = await page.getByRole("link", { name: "Health checks" }).isVisible();
@@ -380,26 +401,10 @@ test("the records filter and its selects share one row as the page narrows", asy
     await expect(page.getByRole("gridcell", { name: "SOA", exact: true })).toBeVisible();
     await setNavigation(navigation);
 
-    const boxes = [];
-    for (const control of controls()) {
-      await expect(control).toBeVisible();
-      boxes.push((await control.boundingBox())!);
-    }
-    const centres = boxes.map((box) => box.y + box.height / 2);
-    expect(Math.max(...centres) - Math.min(...centres), `one row at ${width} px`).toBeLessThan(4);
-    // Left to right in the console's order, none overlapping the next.
-    for (let index = 1; index < boxes.length; index++) {
-      expect(boxes[index].x, `order at ${width} px`).toBeGreaterThanOrEqual(
-        boxes[index - 1].x + boxes[index - 1].width,
-      );
-    }
-    // Nothing is pushed off the page.
-    expect(
-      await page.evaluate(
-        () => document.documentElement.scrollWidth <= document.documentElement.clientWidth,
-      ),
-      `no horizontal page scroll at ${width} px`,
-    ).toBe(true);
+    // Polled, because the layout is still moving while the navigation opens or closes.
+    await expect
+      .poll(rowProblem, { message: `filter row at ${width} px`, timeout: 10_000 })
+      .toBe("none");
   }
 
   // With room to spare the filter keeps the console's 648 px field.
