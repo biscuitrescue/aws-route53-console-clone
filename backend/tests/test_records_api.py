@@ -585,3 +585,81 @@ def test_switching_to_simple_routing_clears_the_policy_fields(
         None,
         None,
     )
+
+
+def test_wildcard_names(client: TestClient, zone: dict[str, Any]) -> None:
+    wildcard = _post(client, zone, name="*", type="A", values=["192.0.2.1"])
+    assert wildcard.status_code == 201
+    assert wildcard.json()["name"] == "*.example.com."
+    assert _post(client, zone, name="*.dev", type="A", values=["192.0.2.1"]).status_code == 201
+
+    partial = _post(client, zone, name="*prod", type="A", values=["192.0.2.1"])
+    assert partial.status_code == 400
+    assert partial.json()["details"][0]["field"] == "name"
+
+    # Below the leftmost label an asterisk is an ordinary character.
+    literal = _post(client, zone, name="a.*.lit", type="A", values=["192.0.2.1"])
+    assert literal.status_code == 201
+
+    wildcard_ns = _post(client, zone, name="*.deleg", type="NS", values=["ns-1.example.net"])
+    assert wildcard_ns.status_code == 400
+    assert wildcard_ns.json()["message"] == "NS records cannot have a wildcard name"
+
+
+def test_one_latency_record_per_region(client: TestClient, zone: dict[str, Any]) -> None:
+    base = {"name": "lat", "type": "A", "values": ["192.0.2.1"], "routing_policy": "latency"}
+    assert _post(client, zone, **base, set_identifier="a", region="us-east-1").status_code == 201
+    assert _post(client, zone, **base, set_identifier="b", region="eu-west-1").status_code == 201
+    duplicate = _post(client, zone, **base, set_identifier="c", region="us-east-1")
+    assert duplicate.status_code == 409
+    assert duplicate.json()["details"][0]["field"] == "region"
+
+
+def test_one_geolocation_record_per_location(client: TestClient, zone: dict[str, Any]) -> None:
+    base = {"name": "geo", "type": "A", "values": ["192.0.2.1"], "routing_policy": "geolocation"}
+
+    def located(identifier: str, **location: str) -> Any:
+        return _post(client, zone, **base, set_identifier=identifier, geolocation=location)
+
+    assert located("us", country_code="US").status_code == 201
+    assert located("eu", continent_code="EU").status_code == 201
+    assert located("default", country_code="*").status_code == 201
+    assert located("ca", country_code="US", subdivision_code="CA").status_code == 201
+
+    duplicate = located("us-again", country_code="us")
+    assert duplicate.status_code == 409
+    assert duplicate.json()["details"][0]["field"] == "geolocation"
+
+
+@pytest.mark.parametrize(
+    "location", [{"continent_code": "ZZ"}, {"country_code": "U1"}, {"country_code": "USA"}]
+)
+def test_geolocation_codes_are_checked(
+    client: TestClient, zone: dict[str, Any], location: dict[str, str]
+) -> None:
+    response = _post(
+        client,
+        zone,
+        name="geo",
+        type="A",
+        values=["192.0.2.1"],
+        routing_policy="geolocation",
+        set_identifier="a",
+        geolocation=location,
+    )
+    assert response.status_code in (400, 422)
+
+
+def test_a_routed_group_shares_the_last_ttl_given(client: TestClient, zone: dict[str, Any]) -> None:
+    base = {"name": "lb", "type": "A", "routing_policy": "weighted", "weight": 1}
+    first = _post(client, zone, **base, values=["192.0.2.1"], set_identifier="a", ttl=300).json()
+    second = _post(client, zone, **base, values=["192.0.2.2"], set_identifier="b", ttl=60).json()
+    assert second["ttl"] == 60
+    assert client.get(_url(zone, f"/{first['id']}")).json()["ttl"] == 60
+
+    client.patch(_url(zone, f"/{first['id']}"), json={"ttl": 120})
+    assert client.get(_url(zone, f"/{second['id']}")).json()["ttl"] == 120
+
+    # A simple record with the same name under another type is not part of the group.
+    other = _post(client, zone, name="lb", type="TXT", values=['"x"'], ttl=900).json()
+    assert client.get(_url(zone, f"/{other['id']}")).json()["ttl"] == 900

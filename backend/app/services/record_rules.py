@@ -1,11 +1,18 @@
 """Route 53's rules for a single record set: shape, routing policy and conflicts."""
 
+import re
 from dataclasses import dataclass
 
 from sqlalchemy.orm import Session
 
 from app.domain.aws_regions import AWS_REGIONS
-from app.domain.dns_names import DnsNameError, normalize_record_name, sort_key, validate_hostname
+from app.domain.dns_names import (
+    DnsNameError,
+    is_wildcard,
+    normalize_record_name,
+    sort_key,
+    validate_hostname,
+)
 from app.domain.enums import FailoverRole, RecordType, RoutingPolicy
 from app.domain.identifiers import new_record_id
 from app.domain.record_validation import MAX_TTL, RecordValueError, validate_values
@@ -18,6 +25,9 @@ _SIMPLE_ONLY_TYPES = frozenset({RecordType.NS, RecordType.SOA})
 _NO_ALIAS_TYPES = frozenset({RecordType.NS, RecordType.SOA})
 _NO_MULTIVALUE_TYPES = frozenset({RecordType.CNAME, RecordType.NS, RecordType.SOA})
 _MAX_WEIGHT = 255
+_CONTINENT_CODES = frozenset({"AF", "AN", "AS", "EU", "NA", "OC", "SA"})
+# A country is two letters; "*" is the default location that catches everything else.
+_COUNTRY_CODE_RE = re.compile(r"^([A-Z]{2}|\*)$")
 
 
 @dataclass(slots=True)
@@ -104,6 +114,14 @@ def _apply_routing(draft: RecordDraft, payload: RecordSetInput) -> None:
                 raise InvalidInputError(
                     "Specify either a continent or a country, not both", field="geolocation"
                 )
+            if continent and continent not in _CONTINENT_CODES:
+                raise InvalidInputError(
+                    f"'{continent}' is not a valid continent code", field="geolocation"
+                )
+            if country and not _COUNTRY_CODE_RE.match(country):
+                raise InvalidInputError(
+                    f"'{country}' is not a valid country code", field="geolocation"
+                )
             if subdivision and not country:
                 raise InvalidInputError("A subdivision requires a country", field="geolocation")
             draft.geo_continent_code = continent or None
@@ -138,6 +156,9 @@ def draft_record(zone_name: str, payload: RecordSetInput) -> RecordDraft:
             f"in zone {zone_name}",
             field="type",
         )
+
+    if record_type is RecordType.NS and is_wildcard(name):
+        raise InvalidInputError("NS records cannot have a wildcard name", field="name")
 
     draft = RecordDraft(name=name, type=record_type)
     if payload.alias_target is not None:
@@ -211,6 +232,20 @@ def check_conflicts(
                 code="RecordSetConflict",
                 field="routing_policy",
             )
+        if same_type and draft.region is not None and sibling.region == draft.region:
+            raise ConflictError(
+                f"RRSet with DNS name {draft.name} and type {draft.type} already has a "
+                f"latency record for the Region {draft.region}",
+                code="RecordSetConflict",
+                field="region",
+            )
+        if same_type and _same_location(draft, sibling):
+            raise ConflictError(
+                f"RRSet with DNS name {draft.name} and type {draft.type} already has a "
+                "geolocation record for this location",
+                code="RecordSetConflict",
+                field="geolocation",
+            )
         if same_type and draft.failover is not None and sibling.failover == draft.failover:
             raise ConflictError(
                 f"RRSet with DNS name {draft.name} and type {draft.type} already has a "
@@ -218,6 +253,30 @@ def check_conflicts(
                 code="RecordSetConflict",
                 field="failover",
             )
+
+
+def _same_location(draft: RecordDraft, record: RecordSet) -> bool:
+    if draft.routing_policy is not RoutingPolicy.GEOLOCATION:
+        return False
+    return (draft.geo_continent_code, draft.geo_country_code, draft.geo_subdivision_code) == (
+        record.geo_continent_code,
+        record.geo_country_code,
+        record.geo_subdivision_code,
+    )
+
+
+def align_group_ttl(db: Session, zone: HostedZone, draft: RecordDraft, record_id: str) -> None:
+    """Give every record of a routed group the TTL of the one just saved.
+
+    Records that share a name, type and routing policy are answered as one group, and
+    Route 53 changes all of their TTLs to the last value specified.
+    """
+    if draft.routing_policy is RoutingPolicy.SIMPLE or draft.ttl is None:
+        return
+    for sibling in record_repository.list_at_name(db, zone.id, draft.name):
+        in_group = sibling.type == draft.type and sibling.routing_policy == draft.routing_policy
+        if in_group and sibling.id != record_id and not sibling.is_alias:
+            sibling.ttl = draft.ttl
 
 
 def ensure_not_required(zone_name: str, record: RecordSet) -> None:

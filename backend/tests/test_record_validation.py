@@ -50,7 +50,7 @@ INVALID: list[tuple[RecordType, list[str], str]] = [
     (RecordType.MX, ["ten mail.example.com"], "MX priority"),
     (RecordType.MX, ["10 bad..host"], "not a valid domain name"),
     (RecordType.NS, ["not a host"], "not a valid domain name"),
-    (RecordType.PTR, ["under_score!.example.com"], "not a valid domain name"),
+    (RecordType.PTR, ["has space.example.com"], "not a valid domain name"),
     (RecordType.SRV, ["10 60 sip.example.com"], "SRV record doesn't have 4 fields"),
     (RecordType.SRV, ["10 60 99999 sip.example.com"], "between 0 and 65535"),
     (RecordType.CAA, ["0 issue"], "CAA record doesn't have 3 fields"),

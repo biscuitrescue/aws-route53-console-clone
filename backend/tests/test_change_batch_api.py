@@ -224,3 +224,21 @@ def test_an_empty_or_malformed_batch_is_rejected(client: TestClient, zone: dict[
     bad_action = _batch(client, zone, _change("REPLACE", "www", "A", ["192.0.2.1"]))
     assert bad_action.status_code == 422
     assert bad_action.json()["details"][0]["field"] == "changes.0.action"
+
+
+def test_a_batch_aligns_the_ttl_of_a_routed_group(client: TestClient, zone: dict[str, Any]) -> None:
+    def weighted(identifier: str, ttl: int) -> dict[str, Any]:
+        return _change(
+            "CREATE",
+            "lb",
+            "A",
+            ["192.0.2.1"],
+            ttl=ttl,
+            routing_policy="weighted",
+            set_identifier=identifier,
+            weight=1,
+        )
+
+    assert _batch(client, zone, weighted("a", 300), weighted("b", 60)).status_code == 200
+    items = client.get(_records_url(zone), params={"filter": "name:eq:lb.example.com"}).json()
+    assert {item["ttl"] for item in items["items"]} == {60}

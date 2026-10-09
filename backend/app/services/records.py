@@ -58,6 +58,7 @@ def create_record(db: Session, zone: HostedZone, payload: RecordSetInput) -> Rec
     record_rules.check_conflicts(db, zone, draft)
     record = record_rules.build_record(zone.id, draft)
     db.add(record)
+    record_rules.align_group_ttl(db, zone, draft, record.id)
     db.commit()
     return record
 
@@ -88,6 +89,7 @@ def update_record(
         record_rules.ensure_not_required(zone.name, record)
     record_rules.check_conflicts(db, zone, draft, exclude_id=record.id)
     record_rules.apply_draft(record, draft)
+    record_rules.align_group_ttl(db, zone, draft, record.id)
     db.commit()
     return record
 

@@ -66,7 +66,7 @@ def test_duplicate_names_are_allowed_with_distinct_ids(client: TestClient) -> No
     assert first["name_servers"] != second["name_servers"]
 
 
-@pytest.mark.parametrize("name", ["bad..name", "-bad.com", "has space.com", "*.example.com", "."])
+@pytest.mark.parametrize("name", ["bad..name", "münchen.de", "has space.com", "*.example.com", "."])
 def test_invalid_domain_names_are_rejected(client: TestClient, name: str) -> None:
     response = client.post(ZONES, json={"name": name})
     assert response.status_code == 400
@@ -80,6 +80,11 @@ def test_invalid_domain_name_uses_route53_wording(client: TestClient) -> None:
     assert response.json()["message"] == (
         "DomainLabelEmpty (Domain label is empty) encountered with 'bad..name'"
     )
+
+
+@pytest.mark.parametrize("name", ["my!zone.com", "a&b.com", "-lead.com"])
+def test_names_may_use_the_characters_the_console_lists(client: TestClient, name: str) -> None:
+    assert create_zone(client, name)["name"] == f"{name}."
 
 
 def test_empty_name_fails_request_validation(client: TestClient) -> None:

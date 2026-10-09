@@ -67,6 +67,7 @@ def _save(
         record_rules.apply_draft(record, draft)
         outcome.updated += 1
     db.flush()
+    record_rules.align_group_ttl(db, zone, draft, record.id)
     outcome.record_sets.append(record)
 
 

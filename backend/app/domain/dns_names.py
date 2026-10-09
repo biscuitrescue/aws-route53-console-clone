@@ -9,7 +9,9 @@ MAX_NAME_LENGTH = 253
 MAX_LABEL_LENGTH = 63
 WILDCARD = "*"
 
-_LABEL_RE = re.compile(r"^[a-z0-9_]([a-z0-9_-]*[a-z0-9_])?$")
+# Route 53 accepts these characters in the names of hosted zones and records; the console
+# lists them under the "Domain name" field. Anything else (spaces, non-ASCII) is rejected.
+_LABEL_RE = re.compile(r"""^[a-z0-9!"#$%&'()*+,\-/:;<=>?@\[\\\]^_`{|}~]+$""")
 
 
 class DnsNameError(ValueError):
@@ -22,19 +24,27 @@ def _problem(code: str, description: str, name: str) -> DnsNameError:
 
 
 def _validate_labels(name: str, *, allow_wildcard: bool) -> None:
+    """Check each label.
+
+    An asterisk is a wildcard only as the whole leftmost label of a record name. It is
+    not allowed anywhere in the leftmost label of a hosted zone name, and in any other
+    position Route 53 treats it as a literal character.
+    """
     for position, label in enumerate(name.split(".")):
         if not label:
             raise _problem("DomainLabelEmpty", "Domain label is empty", name)
         if len(label) > MAX_LABEL_LENGTH:
             raise _problem("DomainLabelTooLong", "Domain label is too long", name)
-        if label == WILDCARD:
-            if allow_wildcard and position == 0:
-                continue
-            raise _problem(
-                "InvalidDomainName", "The wildcard is only allowed as the leftmost label", name
-            )
         if not _LABEL_RE.match(label):
             raise _problem("InvalidDomainName", "Domain name contains invalid characters", name)
+        if position == 0 and WILDCARD in label and not (allow_wildcard and label == WILDCARD):
+            raise _problem(
+                "InvalidDomainName",
+                "An asterisk in the leftmost label must be the whole label"
+                if allow_wildcard
+                else "The leftmost label cannot contain an asterisk",
+                name,
+            )
 
 
 def _canonical(raw: str, *, allow_wildcard: bool) -> str:
@@ -97,6 +107,11 @@ def to_absolute(name: str, origin: str) -> str:
     if name.endswith("."):
         return name
     return f"{name}." if origin == "." else f"{name}.{origin}"
+
+
+def is_wildcard(name: str) -> bool:
+    """Whether a canonical record name is a wildcard such as ``*.example.com.``."""
+    return name.startswith(f"{WILDCARD}.")
 
 
 def sort_key(name: str) -> str:

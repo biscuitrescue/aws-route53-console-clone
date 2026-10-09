@@ -50,7 +50,7 @@ match it closely.
 | Hosted zones | List with property filter, sorting, pagination and preferences; details side panel; create (public or private with VPC associations, tags); edit description and tags; delete with typed confirmation and Route 53's "zone must be empty" rule. |
 | DNS records | A, AAAA, CNAME, TXT, MX, NS, PTR, SRV, CAA (plus the zone's SOA). Table with free-text and property filters, type / routing policy / alias quick filters, sorting, pagination, preferences; quick create for several records at once; edit in the side panel; delete with a confirmation listing the records. Simple, weighted, latency, failover, geolocation and multivalue routing, and alias records. |
 | Route 53 experience | The console's frame: global header with search, toolbar with breadcrumbs, side navigation, stacked flash notifications, help panel behind every "Info" link, side split panel, footer. Tables, forms, modals, empty and no-match states use the console's wording. |
-| Route 53 behaviour | Every zone gets an apex NS (TTL 172800, four `awsdns` name servers) and SOA (TTL 900) that cannot be deleted. CNAMEs cannot sit at the apex or share a name with other records. Values are validated per type. Duplicate zone names are allowed and get distinct IDs. Error messages use Route 53's wording. |
+| Route 53 behaviour | Every zone gets an apex NS (TTL 172800, four `awsdns` name servers) and SOA (TTL 900) that cannot be deleted. CNAMEs cannot sit at the apex or share a name with other records. Values are validated per type. Names accept the characters Route 53 lists; `*` is a wildcard only as the whole leftmost label and never for NS records. Routed records need a record ID, cannot mix policies at one name and type, allow one latency record per Region, one geolocation record per location and one primary and one secondary failover record, and share the last TTL given. Duplicate zone names are allowed and get distinct IDs. Error messages use Route 53's wording. |
 | Placeholders | Dashboard, Health checks, Profiles, Traffic policies, Resolver and the other navigation entries show a "Coming soon" page inside the full console frame. |
 | Bonus: import | BIND zone file import (paste or upload) with a live dry-run preview that reports syntax errors by line and rule violations per record, and an option to replace existing records. |
 | Bonus: export | "Export zone" on the zone page downloads a BIND zone file or JSON in the AWS CLI's `list-resource-record-sets` shape. |
@@ -133,7 +133,7 @@ Every variable is optional. Copy `backend/.env.example` to `backend/.env` and
 
 ```bash
 cd backend
-uv run pytest                    # 315 tests: domain rules, every route, migrations, seed
+uv run pytest                    # 343 tests: domain rules, every route, migrations, seed
 uv run ruff check . && uv run ruff format --check .
 uv run mypy                      # strict
 
