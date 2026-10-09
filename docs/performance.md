@@ -83,6 +83,27 @@ These are measurements of an emulated link, not of the live site. The emulation 
 latency to every request but does not model connection setup, so the first page load of a
 real visit is slower than the first row suggests.
 
+### On the live site, after the deploy
+
+Server time, measured on the VM with the same script, and the browser's timings from
+India against the live site (medians; the "before" page timings are two runs, the "after"
+five):
+
+| | Before | After |
+|---|---|---|
+| Sign-in, server time | 188 | 49 |
+| Sign-in, from India over an open connection | 552 | 423 |
+| Ordinary API calls, server time | 6 to 11 | 6 to 12 |
+| Sign-in page until the credentials are visible | 3878 and 4196 | 2831 (2308 to 5991) |
+| Sign in until the zones are listed | 2355 and 2885 | 1854 (1851 to 2413) |
+| Open a zone until its records are listed | not measured | 1433 (912 to 2459) |
+
+Before the change the credentials could not appear until the page's scripts had loaded and
+the request for them had returned, which is what the first figure timed; they are now part
+of the page. The live figures move with the network from run to run, as the ranges show.
+Sign-in also creates the visitor's sandbox the first time, a copy of the sample zones; the
+49 ms is a returning visitor.
+
 ## What was not changed
 
 - **The region.** Moving the VM to Mumbai (`asia-south1`) would take about 250 ms off every
