@@ -16,7 +16,10 @@ from app.models.base import utcnow
 
 _TOKEN_BYTES = 32
 _LAST_SEEN_RESOLUTION = timedelta(minutes=5)
-_hasher = PasswordHasher()
+# Argon2id with OWASP's baseline parameters: 19 MiB of memory, two passes, one lane. The
+# library default (64 MiB, three passes, four lanes) took 190 ms per sign-in on the 1 GB,
+# two-vCPU server this runs on and a fifth of its free memory; this takes about 40 ms.
+_hasher = PasswordHasher(time_cost=2, memory_cost=19456, parallelism=1)
 # Verified against when the account does not exist, so both failures take the same time.
 _PLACEHOLDER_HASH = _hasher.hash(secrets.token_urlsafe(16))
 
@@ -36,8 +39,8 @@ def _hash_token(token: str) -> str:
     return hashlib.sha256(token.encode()).hexdigest()
 
 
-def login(db: Session, settings: Settings, email: str, password: str) -> tuple[str, AuthSession]:
-    """Check credentials and open a session; returns the raw token for the cookie."""
+def verify_credentials(db: Session, email: str, password: str) -> User:
+    """Return the account the credentials belong to or raise ``UnauthorizedError``."""
     user = db.scalar(select(User).where(User.email == email.strip().lower()))
     password_ok = _verify_password(user.password_hash if user else _PLACEHOLDER_HASH, password)
     if user is None or not password_ok:
@@ -45,7 +48,14 @@ def login(db: Session, settings: Settings, email: str, password: str) -> tuple[s
             "Your authentication information is incorrect. Please try again.",
             code="AuthFailure",
         )
+    # A hash made with older parameters is replaced now that the password is known.
+    if _hasher.check_needs_rehash(user.password_hash):
+        user.password_hash = hash_password(password)
+    return user
 
+
+def open_session(db: Session, settings: Settings, user: User) -> tuple[str, AuthSession]:
+    """Start a session for ``user``; returns the raw token for the cookie."""
     now = utcnow()
     db.execute(delete(AuthSession).where(AuthSession.expires_at <= now))
     token = secrets.token_urlsafe(_TOKEN_BYTES)
@@ -59,6 +69,11 @@ def login(db: Session, settings: Settings, email: str, password: str) -> tuple[s
     db.add(session)
     db.commit()
     return token, session
+
+
+def login(db: Session, settings: Settings, email: str, password: str) -> tuple[str, AuthSession]:
+    """Check credentials and open a session; returns the raw token for the cookie."""
+    return open_session(db, settings, verify_credentials(db, email, password))
 
 
 def authenticate(db: Session, token: str | None) -> AuthSession:

@@ -146,7 +146,7 @@ Every variable is optional. Copy `backend/.env.example` to `backend/.env` and
 | `R53_COOKIE_SECURE` | `false` | Set to `true` when serving over HTTPS |
 | `R53_DEMO_EMAIL`, `R53_DEMO_PASSWORD`, `R53_DEMO_DISPLAY_NAME`, `R53_DEMO_ACCOUNT_ID` | see `.env.example` | The seeded demo account |
 | `R53_SEED_DEMO_DATA` | `true` | Create the sample zones when the demo account has none |
-| `BACKEND_URL` (frontend) | `http://127.0.0.1:8000` | Where Next.js proxies `/api/*`; read at build or dev-server start |
+| `BACKEND_URL` (frontend) | `http://127.0.0.1:8000` | Where Next.js proxies `/api/*` (read at build or dev-server start) and where the sign-in page asks for the published credentials (read when the server runs) |
 
 ### Tests and checks
 
@@ -275,7 +275,13 @@ deploy/
   cross-site requests from carrying it, and no CORS configuration exists to get wrong.
 - **Sessions are opaque and stored hashed.** The cookie holds 256 random bits; the database
   holds only their SHA-256, so a leaked database file contains no usable sessions. Passwords
-  are hashed with Argon2.
+  are hashed with Argon2id (19 MiB, two passes), a setting chosen by measuring it on the
+  server; see [docs/performance.md](docs/performance.md).
+- **Round trips are spent in parallel.** The live server is a continent away from most of
+  its visitors, so a page is as slow as its longest chain of requests. The sign-in page
+  arrives with everything it shows, the console's scripts are downloaded while the visitor
+  is still signing in, and the data of the next page is requested when its link is
+  followed. [docs/performance.md](docs/performance.md) has the measurements.
 - **Rules live in services, not routers.** Routers translate HTTP to service calls. The
   domain layer (`app/domain`) has no database or framework imports and is unit-tested
   directly.

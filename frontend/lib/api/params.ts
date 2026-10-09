@@ -37,6 +37,11 @@ export interface RecordListParams extends ListParams {
   types?: RecordType[];
 }
 
+/** What a table asks for before the visitor filters, sorts or pages it. */
+export function firstPage(pageSize: number): ListParams {
+  return { filters: [], filterMode: "and", sort: undefined, order: "asc", page: 1, pageSize };
+}
+
 /** Translate list parameters into the query string the API expects. */
 export function toListQuery(params: ListParams) {
   return {

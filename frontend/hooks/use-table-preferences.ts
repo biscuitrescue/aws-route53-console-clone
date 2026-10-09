@@ -3,7 +3,7 @@
 import type { CollectionPreferencesProps } from "@cloudscape-design/components/collection-preferences";
 import { useMemo } from "react";
 
-import { usePersistedState } from "./use-persisted-state";
+import { readPersisted, usePersistedState } from "./use-persisted-state";
 
 export type SearchMode = "automatic" | "full" | "fast";
 
@@ -19,6 +19,15 @@ export interface ColumnChoice {
 export const PAGE_SIZES = [10, 30, 50, 100];
 const DEFAULT_PAGE_SIZE = 100;
 
+const storageKey = (tableId: string) => `table.${tableId}`;
+
+/** The page size a table will ask for, so its first page can be requested ahead of it. */
+export function storedPageSize(tableId: string): number {
+  return (
+    readPersisted<Partial<TablePreferences>>(storageKey(tableId), {}).pageSize ?? DEFAULT_PAGE_SIZE
+  );
+}
+
 /** Table preferences (page size, wrap lines, visible columns) remembered per table. */
 export function useTablePreferences(tableId: string, columns: ColumnChoice[]) {
   const defaults = useMemo<TablePreferences>(
@@ -30,7 +39,7 @@ export function useTablePreferences(tableId: string, columns: ColumnChoice[]) {
     [columns],
   );
   const [stored, setPreferences] = usePersistedState<TablePreferences>(
-    `table.${tableId}`,
+    storageKey(tableId),
     defaults,
   );
   // Preferences saved by an older version may lack newer fields.

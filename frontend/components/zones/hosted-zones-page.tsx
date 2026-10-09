@@ -11,6 +11,7 @@ import SpaceBetween from "@cloudscape-design/components/space-between";
 import SplitPanel from "@cloudscape-design/components/split-panel";
 import Table from "@cloudscape-design/components/table";
 import type { TableProps } from "@cloudscape-design/components/table";
+import { useQueryClient } from "@tanstack/react-query";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 
@@ -18,11 +19,14 @@ import { SearchModeNote } from "@/components/common/search-mode-note";
 import { TablePreferencesButton } from "@/components/common/table-preferences";
 import { ConsolePage } from "@/components/shell/console-page";
 import { useFollow } from "@/hooks/use-follow";
-import { useHostedZone, useHostedZones } from "@/hooks/use-hosted-zones";
+import { useHostedZone, useHostedZones, zoneOptions } from "@/hooks/use-hosted-zones";
 import { usePropertyOperatorCompletion } from "@/hooks/use-property-operator-completion";
+import { recordListOptions } from "@/hooks/use-records";
 import { useShortcut } from "@/hooks/use-shortcuts";
-import { useTablePreferences } from "@/hooks/use-table-preferences";
+import { storedPageSize, useTablePreferences } from "@/hooks/use-table-preferences";
 import type { ColumnChoice } from "@/hooks/use-table-preferences";
+import { useWarmUp } from "@/hooks/use-warm-up";
+import { firstPage } from "@/lib/api/params";
 import type { HostedZoneSummary } from "@/lib/api/types";
 import { displayName, formatNumber, orDash, zoneTypeLabel } from "@/lib/format";
 import {
@@ -111,6 +115,9 @@ const TYPE_OPTIONS: PropertyFilterProps.FilteringOption[] = [
 /** `null` until the user sorts: the API's default order is Route 53's own. */
 type Sorting = { field: string; descending: boolean } | null;
 
+/** The zone page is where most visits to this list lead, so its code is fetched ahead. */
+const loadZonePage = () => import("./zone-details-page");
+
 function initialQuery(search: string | null): PropertyFilterProps.Query {
   return search ? { operation: "and", tokens: [{ operator: ":", value: search }] } : EMPTY_QUERY;
 }
@@ -118,6 +125,7 @@ function initialQuery(search: string | null): PropertyFilterProps.Query {
 export function HostedZonesPage() {
   const router = useRouter();
   const follow = useFollow();
+  const queryClient = useQueryClient();
   const searchParams = useSearchParams();
   const filterRef = useRef<PropertyFilterProps.Ref>(null);
   const preferencesRef = useRef<HTMLDivElement>(null);
@@ -157,6 +165,19 @@ export function HostedZonesPage() {
   const total = filtering ? (everyZone.data?.total ?? matches) : matches;
   const details = useHostedZone(selected?.id ?? "", { enabled: selected !== null });
 
+  useWarmUp(loadZonePage);
+
+  /** Follow a link to a zone, asking for the zone and its records while the page opens. */
+  const openZone = (zoneId: string): typeof follow => {
+    return (event) => {
+      void queryClient.prefetchQuery(zoneOptions(zoneId));
+      void queryClient.prefetchQuery(
+        recordListOptions(zoneId, firstPage(storedPageSize("records"))),
+      );
+      follow(event);
+    };
+  };
+
   useShortcut("/", "Focus the filter", () => filterRef.current?.focus());
   useShortcut("c", "Create a hosted zone", () => router.push(routes.createHostedZone));
   useShortcut("r", "Refresh the list", () => void zones.refetch());
@@ -169,7 +190,7 @@ export function HostedZonesPage() {
       isRowHeader: true,
       width: 250,
       cell: (zone) => (
-        <Link href={routes.hostedZone(zone.id)} onFollow={follow}>
+        <Link href={routes.hostedZone(zone.id)} onFollow={openZone(zone.id)}>
           {displayName(zone.name)}
         </Link>
       ),
@@ -327,7 +348,7 @@ export function HostedZonesPage() {
                 <Button
                   disabled={!selected}
                   href={selected ? routes.hostedZone(selected.id) : undefined}
-                  onFollow={follow}
+                  onFollow={selected ? openZone(selected.id) : follow}
                 >
                   View details
                 </Button>

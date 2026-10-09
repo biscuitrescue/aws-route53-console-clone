@@ -4,6 +4,7 @@ type Schemas = components["schemas"];
 
 export type User = Schemas["UserOut"];
 export type Session = Schemas["SessionOut"];
+export type PublishedCredentials = Schemas["PublishedCredentials"];
 
 export type ZoneType = Schemas["ZoneType"];
 export type HostedZoneSummary = Schemas["HostedZoneSummary"];

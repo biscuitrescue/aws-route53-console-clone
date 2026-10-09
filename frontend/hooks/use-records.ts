@@ -1,6 +1,12 @@
 "use client";
 
-import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  keepPreviousData,
+  queryOptions,
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from "@tanstack/react-query";
 
 import { api, unwrap } from "@/lib/api/client";
 import { toListQuery } from "@/lib/api/params";
@@ -8,12 +14,9 @@ import type { RecordListParams } from "@/lib/api/params";
 import { queryKeys } from "@/lib/api/query-keys";
 import type { Change, RecordSetInput, RecordSetUpdate } from "@/lib/api/types";
 
-export function useRecords(
-  zoneId: string,
-  params: RecordListParams,
-  options: { enabled?: boolean } = {},
-) {
-  return useQuery({
+/** One page of a zone's records. Shared with the code that requests it ahead of the page. */
+export function recordListOptions(zoneId: string, params: RecordListParams) {
+  return queryOptions({
     queryKey: queryKeys.recordList(zoneId, params),
     queryFn: () =>
       unwrap(
@@ -24,6 +27,16 @@ export function useRecords(
           },
         }),
       ),
+  });
+}
+
+export function useRecords(
+  zoneId: string,
+  params: RecordListParams,
+  options: { enabled?: boolean } = {},
+) {
+  return useQuery({
+    ...recordListOptions(zoneId, params),
     placeholderData: keepPreviousData,
     enabled: options.enabled ?? true,
   });

@@ -16,10 +16,13 @@ RUN npm run build
 
 FROM node:22-slim AS runtime
 WORKDIR /app
+# The sign-in page asks the backend for the published credentials while it renders.
+ARG BACKEND_URL=http://backend:8000
 ENV NODE_ENV=production \
     NEXT_TELEMETRY_DISABLED=1 \
     PORT=3000 \
-    HOSTNAME=0.0.0.0
+    HOSTNAME=0.0.0.0 \
+    BACKEND_URL=$BACKEND_URL
 # The standalone output carries only the files the server needs.
 COPY --from=build --chown=node:node /app/.next/standalone ./
 COPY --from=build --chown=node:node /app/.next/static ./.next/static

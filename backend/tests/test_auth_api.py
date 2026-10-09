@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 
 from app.config import Settings
 from app.main import create_app
-from app.models import AuthSession
+from app.models import AuthSession, User
 from app.models.base import utcnow
 from tests.conftest import API, PASSWORD
 
@@ -71,6 +71,25 @@ def test_wrong_password_and_unknown_user_fail_the_same_way(
             "details": [],
         }
         assert "set-cookie" not in response.headers
+
+
+def test_a_hash_with_older_parameters_is_upgraded_at_sign_in(
+    anonymous: TestClient, settings: Settings, db: Session
+) -> None:
+    from argon2 import PasswordHasher
+
+    user = db.scalars(select(User)).one()
+    user.password_hash = PasswordHasher(time_cost=3, memory_cost=65536, parallelism=4).hash(
+        PASSWORD
+    )
+    db.commit()
+
+    assert _login(anonymous, settings).status_code == 200
+    db.refresh(user)
+    assert "$m=19456,t=2,p=1$" in user.password_hash
+    # The new hash still verifies, and a wrong password still does not.
+    assert _login(anonymous, settings).status_code == 200
+    assert _login(anonymous, settings, "nope").status_code == 401
 
 
 def test_me_returns_the_session_user(client: TestClient, settings: Settings) -> None:

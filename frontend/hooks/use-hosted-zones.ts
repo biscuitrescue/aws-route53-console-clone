@@ -1,6 +1,12 @@
 "use client";
 
-import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  keepPreviousData,
+  queryOptions,
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from "@tanstack/react-query";
 
 import { api, unwrap } from "@/lib/api/client";
 import { toListQuery } from "@/lib/api/params";
@@ -8,8 +14,9 @@ import type { ZoneListParams } from "@/lib/api/params";
 import { queryKeys } from "@/lib/api/query-keys";
 import type { HostedZoneCreate, HostedZoneUpdate } from "@/lib/api/types";
 
-export function useHostedZones(params: ZoneListParams, options: { enabled?: boolean } = {}) {
-  return useQuery({
+/** One page of the zone list. Shared with the code that requests it ahead of the page. */
+export function zoneListOptions(params: ZoneListParams) {
+  return queryOptions({
     queryKey: queryKeys.zoneList(params),
     queryFn: () =>
       unwrap(
@@ -17,19 +24,28 @@ export function useHostedZones(params: ZoneListParams, options: { enabled?: bool
           params: { query: { ...toListQuery(params), type: params.type } },
         }),
       ),
+  });
+}
+
+export function useHostedZones(params: ZoneListParams, options: { enabled?: boolean } = {}) {
+  return useQuery({
+    ...zoneListOptions(params),
     // Keep the current rows on screen while the next page or filter loads.
     placeholderData: keepPreviousData,
     enabled: options.enabled ?? true,
   });
 }
 
-export function useHostedZone(zoneId: string, options: { enabled?: boolean } = {}) {
-  return useQuery({
+export function zoneOptions(zoneId: string) {
+  return queryOptions({
     queryKey: queryKeys.zone(zoneId),
     queryFn: () =>
       unwrap(api.GET("/api/v1/hostedzones/{zone_id}", { params: { path: { zone_id: zoneId } } })),
-    enabled: options.enabled ?? true,
   });
+}
+
+export function useHostedZone(zoneId: string, options: { enabled?: boolean } = {}) {
+  return useQuery({ ...zoneOptions(zoneId), enabled: options.enabled ?? true });
 }
 
 export function useCreateHostedZone() {

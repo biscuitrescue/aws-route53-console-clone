@@ -1,133 +1,31 @@
-"use client";
-
-import Alert from "@cloudscape-design/components/alert";
-import Box from "@cloudscape-design/components/box";
-import Button from "@cloudscape-design/components/button";
-import Container from "@cloudscape-design/components/container";
-import FormField from "@cloudscape-design/components/form-field";
-import Header from "@cloudscape-design/components/header";
-import Input from "@cloudscape-design/components/input";
-import SpaceBetween from "@cloudscape-design/components/space-between";
-import { useQuery } from "@tanstack/react-query";
-import { useRouter, useSearchParams } from "next/navigation";
-import { Suspense, useState } from "react";
-import type { FormEvent } from "react";
+import { Suspense } from "react";
 
 import { Logo } from "@/components/shell/logo";
-import { useSignIn } from "@/hooks/use-session";
-import { api, unwrap } from "@/lib/api/client";
-import { ApiError } from "@/lib/api/errors";
-import { routes } from "@/lib/routes";
+import type { PublishedCredentials } from "@/lib/api/types";
+import { BACKEND_URL } from "@/lib/server/backend";
 
+import { SignInForm } from "./sign-in-form";
 import styles from "./signin.module.css";
 
-/** Only follow redirects to pages of this app, never to another origin. */
-function safeRedirect(target: string | null): string {
-  return target && target.startsWith("/") && !target.startsWith("//") ? target : routes.hostedZones;
-}
+// Rendered per request: the page carries the published credentials, so the browser does
+// not have to ask for them after its scripts have loaded.
+export const dynamic = "force-dynamic";
 
-function SignInForm() {
-  const router = useRouter();
-  const searchParams = useSearchParams();
-  const signIn = useSignIn();
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [submitted, setSubmitted] = useState(false);
-
-  const published = useQuery({
-    queryKey: ["published-credentials"],
-    queryFn: () => unwrap(api.GET("/api/v1/auth/published-credentials")),
-    retry: false,
-    staleTime: Infinity,
-  });
-
-  const submit = (credentials: { email: string; password: string }) => {
-    signIn.mutate(credentials, {
-      onSuccess: () => router.replace(safeRedirect(searchParams.get("redirect"))),
+async function publishedCredentials(): Promise<PublishedCredentials | null> {
+  try {
+    const response = await fetch(`${BACKEND_URL}/api/v1/auth/published-credentials`, {
+      cache: "no-store",
+      signal: AbortSignal.timeout(2000),
     });
-  };
-
-  const onSubmit = (event: FormEvent) => {
-    event.preventDefault();
-    setSubmitted(true);
-    if (email.trim() && password) submit({ email: email.trim(), password });
-  };
-
-  const failure =
-    signIn.error instanceof ApiError
-      ? signIn.error.message
-      : signIn.error
-        ? "The sign-in service is not reachable. Try again."
-        : null;
-
-  return (
-    <form onSubmit={onSubmit} noValidate>
-      <Container header={<Header variant="h2">Sign In</Header>}>
-        <SpaceBetween size="m">
-          <Box>Sign in to the Route 53 console clone.</Box>
-          {failure && (
-            <Alert type="error" header="There was a problem">
-              {failure}
-            </Alert>
-          )}
-          <FormField
-            label="Email address"
-            errorText={submitted && !email.trim() ? "Enter your email address." : undefined}
-          >
-            <Input
-              type="email"
-              inputMode="email"
-              autoComplete="username"
-              placeholder="username@example.com"
-              value={email}
-              onChange={({ detail }) => setEmail(detail.value)}
-              autoFocus
-            />
-          </FormField>
-          <FormField
-            label="Password"
-            errorText={submitted && !password ? "Enter your password." : undefined}
-          >
-            <Input
-              type="password"
-              autoComplete="current-password"
-              value={password}
-              onChange={({ detail }) => setPassword(detail.value)}
-            />
-          </FormField>
-          <Button variant="primary" fullWidth formAction="submit" loading={signIn.isPending}>
-            Sign in
-          </Button>
-          {published.data && (
-            <Alert
-              type="info"
-              header="Sign-in credentials"
-              action={
-                <Button
-                  formAction="none"
-                  disabled={signIn.isPending}
-                  onClick={() => {
-                    setEmail(published.data.email);
-                    setPassword(published.data.password);
-                    submit(published.data);
-                  }}
-                >
-                  Sign in with this account
-                </Button>
-              }
-            >
-              <Box variant="code">{published.data.email}</Box>
-              <br />
-              <Box variant="code">{published.data.password}</Box>
-            </Alert>
-          )}
-        </SpaceBetween>
-      </Container>
-    </form>
-  );
+    return response.ok ? ((await response.json()) as PublishedCredentials) : null;
+  } catch {
+    // The page still works without them; sign-in itself reports an unreachable service.
+    return null;
+  }
 }
 
-export default function SignInPage() {
+export default async function SignInPage() {
+  const published = await publishedCredentials();
   return (
     <main className={styles.page}>
       <div className={styles.logo}>
@@ -138,7 +36,7 @@ export default function SignInPage() {
           <div className={styles.card}>
             {/* useSearchParams needs a Suspense boundary so the page can be prerendered. */}
             <Suspense>
-              <SignInForm />
+              <SignInForm published={published} />
             </Suspense>
           </div>
           <p className={styles.legal}>
