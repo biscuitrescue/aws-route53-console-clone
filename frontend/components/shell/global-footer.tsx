@@ -115,7 +115,7 @@ export function GlobalFooter() {
       </button>
       <span className={styles.spacer} />
       <span className={styles.copyright}>
-        © 2026, Route 53 console clone. Not affiliated with Amazon Web Services.
+        © 2026, Route 53 console clone. Not affiliated with AWS.
       </span>
       <button type="button" className={styles.item} title="Privacy" onClick={about}>
         Privacy

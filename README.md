@@ -162,7 +162,7 @@ Every variable is optional. Copy `backend/.env.example` to `backend/.env` and
 
 ```bash
 cd backend
-uv run pytest                    # 357 tests: domain rules, every route, migrations, seed
+uv run pytest                    # 499 tests: domain rules, every route, migrations, seed, sandboxes, security
 uv run ruff check . && uv run ruff format --check .
 uv run mypy                      # strict
 
@@ -173,17 +173,19 @@ npx playwright install chromium   # once
 npm run test:e2e                 # needs the backend and frontend running
 ```
 
-The end-to-end tests (ten, in `frontend/e2e`) drive a real browser through the product:
+The end-to-end tests (twelve, in `frontend/e2e`) drive a real browser through the product:
 
 - `smoke.spec.ts`: sign in through the route guard, create a zone, create one record of
-  every type, filter, edit, check that a non-empty zone cannot be deleted, bulk-delete, sign
-  out and back in, delete the zone; a session surviving a new browser context; the
-  placeholder sections.
+  each of the sixteen types, follow the change from `PENDING` to `INSYNC`, filter, edit,
+  check that a non-empty zone cannot be deleted, bulk-delete, sign out and back in, delete
+  the zone; a session surviving a new browser context; the placeholder sections; two
+  browsers side by side, each in its own sandbox.
 - `features.spec.ts`: zone file import (errors by line, preview, import, the all-or-nothing
   rule) and both exports; bulk TTL edit and bulk delete; every keyboard shortcut and the
   global search; dark mode surviving a reload; the header menus; the record wizard; a
-  private zone and editing its VPCs and tags. These tests also fail on any browser console
-  error or 5xx response.
+  private zone and editing its VPCs and tags; the records filter row measured at 1920,
+  1300, 950 and 800 px. These tests also fail on any browser console error or 5xx
+  response.
 
 Each test creates the zones it needs and removes them, so they can run against a shared
 deployment: `E2E_BASE_URL=https://... npm run test:e2e`.
@@ -754,6 +756,12 @@ Identity-Aware Proxy (`gcloud compute ssh --tunnel-through-iap`).
 PROJECT_ID=<PROJECT_ID> DEMO_PASSWORD='<password for the demo account>' ./deploy/gcp/deploy.sh
 ```
 
+The backend container migrates the database when it starts. Before it does, `deploy.sh`
+copies the live database on the VM to `/srv/route53/backups/pre-deploy-<tag>.db` with
+SQLite's online backup, checks the copy's integrity and keeps the four newest. To go back,
+stop the stack, put that file in place of `/srv/route53/data/route53.db` and redeploy the
+earlier tag with `BUILD=skip IMAGE_TAG=<tag>`.
+
 `deploy.sh` builds both images with Cloud Build (tagged with the git commit), uploads the
 Compose file, Caddyfile and environment to the VM, pulls and restarts the stack, and
 smoke-tests `https://<site>/api/v1/health`. A full deploy takes about six minutes, most of
@@ -794,7 +802,9 @@ Registry repository, the backup bucket and the service account.
   Each browser that signs in to it gets its own sandbox; the sandbox is tied to a cookie,
   not to a person.
 - Routing policies: simple, weighted, latency, failover, geolocation and multivalue answer
-  are stored and validated. Geoproximity and IP-based routing are not implemented.
+  are stored and validated. Geoproximity and IP-based routing are listed but disabled:
+  IP-based routing points at CIDR collections, a resource the clone does not have, and
+  the console's geoproximity form was not among the captures the UI was built from.
 - All sixteen record types of the console's select can be created (the nine in the
   assignment, plus SPF, NAPTR, DS, TLSA, SSHFP, HTTPS and SVCB), along with the zone's SOA.
   Their values are checked for form only: a DS digest has to have the length its digest

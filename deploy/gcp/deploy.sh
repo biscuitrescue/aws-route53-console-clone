@@ -82,6 +82,15 @@ remote "set -e
   sudo gcloud auth configure-docker ${REGISTRY_HOST} --quiet
   cd ${REMOTE_DIR}
   sudo docker compose pull --quiet
+  # The new backend migrates the database when it starts. Keep a consistent copy of it
+  # as it is now, next to the three most recent earlier ones.
+  if [ -f data/route53.db ]; then
+    sudo mkdir -p backups
+    sudo sqlite3 data/route53.db \".backup 'backups/pre-deploy-${IMAGE_TAG}.db'\"
+    sudo sqlite3 backups/pre-deploy-${IMAGE_TAG}.db 'PRAGMA integrity_check;' | grep -qx ok
+    ls -1t backups/pre-deploy-*.db | tail -n +5 | xargs -r sudo rm -f
+    echo \"Database copied to ${REMOTE_DIR}/backups/pre-deploy-${IMAGE_TAG}.db\"
+  fi
   sudo docker compose up -d --remove-orphans
   sudo docker image prune -af >/dev/null
   sudo docker compose ps"
