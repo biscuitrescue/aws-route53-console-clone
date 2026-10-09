@@ -1,7 +1,7 @@
 /* Cloudscape styles its own components; this only covers the bare document around them. */
 body {
   margin: 0;
-  font-family: "Open Sans", "Helvetica Neue", Roboto, Arial, sans-serif;
+  font-family: "Amazon Ember", "Ubuntu Sans Variable", "Helvetica Neue", Roboto, Arial, sans-serif;
   font-size: 14px;
   line-height: 20px;
 }

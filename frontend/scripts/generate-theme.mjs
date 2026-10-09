@@ -31,10 +31,19 @@ const ORANGE = "#ff9900";
 const ORANGE_PRESSED = "#fa6f00";
 const INK = "#0f141a";
 
-// The console is stock Cloudscape with one visible difference: primary buttons are orange
-// with dark text, in light and dark mode. Values come from the console's CSS variables.
+// The console sets its text in Amazon Ember, which is not licensed for reuse. It is named
+// first so a machine that has it uses it; otherwise Ubuntu Sans stands in, the freely
+// licensed face whose glyph widths are closest (within 1% for regular text).
+const FONT = '"Amazon Ember", "Ubuntu Sans Variable", "Helvetica Neue", Roboto, Arial, sans-serif';
+
+// The console is stock Cloudscape with two visible differences: its typeface, and primary
+// buttons that are orange with dark text in light and dark mode. Values come from the
+// console's CSS variables.
 const theme = {
   tokens: {
+    fontFamilyBase: FONT,
+    fontFamilyHeading: FONT,
+    fontFamilyDisplay: FONT,
     colorBackgroundButtonPrimaryDefault: ORANGE,
     colorBackgroundButtonPrimaryHover: ORANGE_PRESSED,
     colorBackgroundButtonPrimaryActive: ORANGE_PRESSED,

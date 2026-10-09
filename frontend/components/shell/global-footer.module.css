@@ -1,31 +1,31 @@
-/* The console's footer bar; identical in light and dark mode. */
+/* The console's footer bar; identical in light and dark mode. Positions are the console's:
+   CloudShell at 16 px, then 25 px between items, 31 px before the legal links. */
 .footer {
   position: sticky;
   inset-block-end: 0;
   z-index: 1002;
   display: flex;
   align-items: center;
-  gap: 24px;
+  gap: 25px;
   box-sizing: border-box;
   block-size: 35px;
   padding-inline: 16px;
+  border-block-start: 1px solid #424650;
   background: #161d26;
   color: #c6c6cd;
   font-size: 12px;
-  font-weight: 500;
   line-height: 14px;
   white-space: nowrap;
-  overflow: hidden;
 }
 
 .item {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 5px;
   border: 0;
   padding: 0;
   background: transparent;
-  color: #dedee3;
+  color: #ebebf0;
   font: inherit;
   text-decoration: none;
   cursor: pointer;
@@ -46,7 +46,29 @@
   flex: 1;
 }
 
-@media (max-width: 900px) {
+.copyright {
+  margin-inline-end: 6px;
+}
+
+/* When space is short the copyright moves to a line of its own, as in the console. */
+@media (max-width: 1100px) {
+  .footer {
+    flex-wrap: wrap;
+    row-gap: 6px;
+    block-size: auto;
+    min-block-size: 35px;
+    padding-block: 9px;
+  }
+
+  .copyright {
+    order: 1;
+    flex-basis: 100%;
+    margin: 0;
+    text-align: center;
+  }
+}
+
+@media (max-width: 560px) {
   .optional {
     display: none;
   }

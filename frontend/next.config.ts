@@ -8,6 +8,7 @@ const backendUrl = process.env.BACKEND_URL ?? "http://127.0.0.1:8000";
 const nextConfig: NextConfig = {
   output: "standalone",
   poweredByHeader: false,
+  devIndicators: false,
   agentRules: false,
   transpilePackages: ["@cloudscape-design/components", "@cloudscape-design/component-toolkit"],
   async rewrites() {

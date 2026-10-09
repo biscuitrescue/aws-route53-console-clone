@@ -17,9 +17,9 @@ export function ConsoleFrame({ children }: { children: ReactNode }) {
 
   return (
     <NotificationsProvider>
-      <GlobalHeader />
+      <GlobalHeader onShowShortcuts={() => setShortcutsVisible(true)} />
       {children}
-      <GlobalFooter onShowShortcuts={() => setShortcutsVisible(true)} />
+      <GlobalFooter />
       {shortcutsVisible && <ShortcutsModal onDismiss={() => setShortcutsVisible(false)} />}
     </NotificationsProvider>
   );

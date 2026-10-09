@@ -62,7 +62,7 @@ function SignInForm() {
 
   return (
     <form onSubmit={onSubmit} noValidate>
-      <Container header={<Header variant="h2">Sign in</Header>}>
+      <Container header={<Header variant="h2">Sign In</Header>}>
         <SpaceBetween size="m">
           <Box>Access the Route 53 console clone with the demo account.</Box>
           {failure && (
@@ -131,7 +131,7 @@ export default function SignInPage() {
   return (
     <main className={styles.page}>
       <div className={styles.logo}>
-        <Logo height={44} />
+        <Logo width={84} smile="#ff9900" />
       </div>
       <div className={styles.columns}>
         <div>

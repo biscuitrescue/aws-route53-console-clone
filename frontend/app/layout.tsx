@@ -1,4 +1,6 @@
 import "@cloudscape-design/global-styles/index.css";
+import "@fontsource-variable/ubuntu-sans/wght.css";
+import "@fontsource-variable/ubuntu-sans/wght-italic.css";
 import "./theme.generated.css";
 import "./globals.css";
 
