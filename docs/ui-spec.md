@@ -294,10 +294,10 @@ scrolls horizontally with the sticky scrollbar (S52, S53).
 |---|---|
 | Path routes (`/route53/v2/hostedzones/{id}`) instead of hash routes; the console's hash URLs redirect to them. | Server-side route guard and deep links need real paths. |
 | Ubuntu Sans where Amazon Ember is not installed. | Amazon Ember is not licensed for reuse; see section 2. |
-| The sign-in page is one card with email and password, shows the demo credentials and says it is a demo. No user-type tiles, "Next" step or AWS legal text. | Authentication is mocked, and a public look-alike of the AWS sign-in page must not be mistakable for the real one. |
-| The footer's copyright line names the clone, and Privacy, Terms and Cookie preferences open a note about the demo. | Same reason; there is no legal entity behind the demo. |
-| Amazon Q, CloudShell, Agent Toolkit, Language, Switch project, Projects, Team, Billing, Profile and Notification center answer with a "not available in this demo" notice. | They belong to the AWS console, not to Route 53; the brief allows mocking them. |
-| The account menu shows the demo account's ID and user instead of plan status and credits. | There is no billing. |
+| The sign-in page is one card with email and password, shows the sign-in credentials and says it is a clone that is not affiliated with AWS. No user-type tiles, "Next" step or AWS legal text. | Authentication is mocked, and a public look-alike of the AWS sign-in page must not be mistakable for the real one. |
+| The footer's copyright line names the clone, and Privacy, Terms and Cookie preferences open a note about the clone. | Same reason; there is no legal entity behind the clone. |
+| Amazon Q, CloudShell, Agent Toolkit, Language, Switch project, Projects, Team, Billing, Profile and Notification center answer with a "not available in this clone" notice. | They belong to the AWS console, not to Route 53; the brief allows mocking them. |
+| The account menu shows the account's ID and user instead of plan status and credits. | There is no billing. |
 | Record types SPF, NAPTR, DS, TLSA, SSHFP, HTTPS and SVCB, and the IP-based and Geoproximity routing policies, are listed but disabled. | Assignment scope: nine record types. |
 | Alias targets other than a record of the same zone are entered as a DNS name and hosted zone ID. | The clone has no AWS resources to list. |
 | The wizard's tiles have no illustrations, and its "Define record" dialog uses the quick-create fields without the console's longer field descriptions. | The illustrations are AWS artwork; the fields are shared with quick create. |

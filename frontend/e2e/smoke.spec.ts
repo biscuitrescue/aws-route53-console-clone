@@ -7,7 +7,7 @@ import type { RecordType } from "../lib/api/types";
 const EMAIL = process.env.E2E_EMAIL ?? "demo@example.com";
 const PASSWORD = process.env.E2E_PASSWORD ?? "Route53Demo!";
 
-/** A zone name no other run uses, so the test can run against a shared demo. */
+/** A zone name no other run uses, so the test can run against a shared deployment. */
 const ZONE = `e2e-${Date.now().toString(36)}.example`;
 
 const RECORDS: { name: string; type: RecordType; value: string }[] = [

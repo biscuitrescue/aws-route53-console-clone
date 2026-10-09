@@ -162,7 +162,7 @@ function Search({ onAskAssistant }: { onAskAssistant: () => void }) {
 export function GlobalHeader({ onShowShortcuts }: { onShowShortcuts: () => void }) {
   const router = useRouter();
   const notify = useNotify();
-  const askAssistant = () => notify.info("Amazon Q is not available in this demo", ASSISTANT_NOTE);
+  const askAssistant = () => notify.info("Amazon Q is not available in this clone", ASSISTANT_NOTE);
 
   return (
     <header id="h" className={styles.header}>
@@ -212,7 +212,7 @@ export function GlobalHeader({ onShowShortcuts }: { onShowShortcuts: () => void 
           title="CloudShell"
           onClick={() =>
             notify.info(
-              "CloudShell is not available in this demo",
+              "CloudShell is not available in this clone",
               "This clone has no shell. Its REST API is documented at /api/docs.",
             )
           }

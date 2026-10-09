@@ -72,7 +72,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/auth/demo-credentials": {
+    "/api/v1/auth/published-credentials": {
         parameters: {
             query?: never;
             header?: never;
@@ -80,10 +80,10 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Credentials of the public demo account
-         * @description Lets the sign-in page of a public demo show how to get in. Returns 404 when `R53_DEMO_CREDENTIALS_PUBLIC` is off.
+         * Credentials the sign-in page may show
+         * @description Lets the sign-in page of a public deployment show how to get in. Returns 404 when `R53_DEMO_CREDENTIALS_PUBLIC` is off.
          */
-        get: operations["demo_credentials"];
+        get: operations["published_credentials"];
         put?: never;
         post?: never;
         delete?: never;
@@ -321,13 +321,6 @@ export interface components {
              * @description Record sets created or updated
              */
             record_sets: components["schemas"]["RecordSetOut"][];
-        };
-        /** DemoCredentials */
-        DemoCredentials: {
-            /** Email */
-            email: string;
-            /** Password */
-            password: string;
         };
         /** ErrorDetail */
         ErrorDetail: {
@@ -586,6 +579,13 @@ export interface components {
             page_size: number;
             /** Pages */
             pages: number;
+        };
+        /** PublishedCredentials */
+        PublishedCredentials: {
+            /** Email */
+            email: string;
+            /** Password */
+            password: string;
         };
         /**
          * RecordSetInput
@@ -931,7 +931,7 @@ export interface operations {
             };
         };
     };
-    demo_credentials: {
+    published_credentials: {
         parameters: {
             query?: never;
             header?: never;
@@ -946,7 +946,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["DemoCredentials"];
+                    "application/json": components["schemas"]["PublishedCredentials"];
                 };
             };
             /** @description The hosted zone or record does not exist */

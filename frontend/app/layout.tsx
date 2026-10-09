@@ -12,7 +12,7 @@ import { Providers } from "./providers";
 
 export const metadata: Metadata = {
   title: "Route 53",
-  description: "A clone of the Amazon Route 53 console. A demo project, not affiliated with AWS.",
+  description: "A clone of the Amazon Route 53 console, not affiliated with AWS.",
   robots: { index: false, follow: false },
 };
 

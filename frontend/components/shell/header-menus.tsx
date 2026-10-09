@@ -47,7 +47,7 @@ function useNotAvailable() {
   const notify = useNotify();
   return (feature: string) =>
     notify.info(
-      `${feature} is not available in this demo`,
+      `${feature} is not available in this clone`,
       "This clone implements Route 53 hosted zones and records. Other AWS services, account settings and billing are mocked.",
     );
 }
@@ -154,7 +154,7 @@ export function ServicesMenu() {
               </ul>
             ) : (
               <p className={styles.servicesEmpty}>
-                Nothing to show here. Route 53 is the only service in this demo; find it under
+                Nothing to show here. Route 53 is the only service in this clone; find it under
                 Networking &amp; Content Delivery.
               </p>
             )}
@@ -363,7 +363,7 @@ export function AccountMenu() {
         <div className={`${styles.menu} ${styles.accountMenu}`} role="menu" aria-label="Account">
           {mocked(account)}
           <div className={styles.accountSummary}>
-            <span>Demo account</span>
+            <span>Account</span>
             <div>
               <div>
                 <span>Account ID</span>

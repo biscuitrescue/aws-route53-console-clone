@@ -34,9 +34,9 @@ function SignInForm() {
   const [password, setPassword] = useState("");
   const [submitted, setSubmitted] = useState(false);
 
-  const demo = useQuery({
-    queryKey: ["demo-credentials"],
-    queryFn: () => unwrap(api.GET("/api/v1/auth/demo-credentials")),
+  const published = useQuery({
+    queryKey: ["published-credentials"],
+    queryFn: () => unwrap(api.GET("/api/v1/auth/published-credentials")),
     retry: false,
     staleTime: Infinity,
   });
@@ -64,7 +64,7 @@ function SignInForm() {
     <form onSubmit={onSubmit} noValidate>
       <Container header={<Header variant="h2">Sign In</Header>}>
         <SpaceBetween size="m">
-          <Box>Access the Route 53 console clone with the demo account.</Box>
+          <Box>Sign in to the Route 53 console clone.</Box>
           {failure && (
             <Alert type="error" header="There was a problem">
               {failure}
@@ -98,27 +98,27 @@ function SignInForm() {
           <Button variant="primary" fullWidth formAction="submit" loading={signIn.isPending}>
             Sign in
           </Button>
-          {demo.data && (
+          {published.data && (
             <Alert
               type="info"
-              header="Demo account"
+              header="Sign-in credentials"
               action={
                 <Button
                   formAction="none"
                   disabled={signIn.isPending}
                   onClick={() => {
-                    setEmail(demo.data.email);
-                    setPassword(demo.data.password);
-                    submit(demo.data);
+                    setEmail(published.data.email);
+                    setPassword(published.data.password);
+                    submit(published.data);
                   }}
                 >
-                  Sign in as demo
+                  Sign in with this account
                 </Button>
               }
             >
-              <Box variant="code">{demo.data.email}</Box>
+              <Box variant="code">{published.data.email}</Box>
               <br />
-              <Box variant="code">{demo.data.password}</Box>
+              <Box variant="code">{published.data.password}</Box>
             </Alert>
           )}
         </SpaceBetween>
@@ -142,11 +142,11 @@ export default function SignInPage() {
             </Suspense>
           </div>
           <p className={styles.legal}>
-            This is a demo clone of the Amazon Route 53 console built for a course assignment. It is
-            not affiliated with Amazon Web Services. Never enter real AWS credentials here.
+            This is a clone of the Amazon Route 53 console built for a course assignment. It is not
+            affiliated with Amazon Web Services. Never enter real AWS credentials here.
           </p>
         </div>
-        <section className={styles.promo} aria-label="About this demo">
+        <section className={styles.promo} aria-label="About this clone">
           <h1 className={styles.promoTitle}>Route 53 console clone</h1>
           <p className={styles.promoText}>
             Hosted zones and DNS records with the look and behaviour of the real console, on

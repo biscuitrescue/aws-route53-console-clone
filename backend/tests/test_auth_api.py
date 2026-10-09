@@ -170,18 +170,16 @@ def test_docs_are_served(anonymous: TestClient) -> None:
     assert "/api/v1/hostedzones/{zone_id}/records:batch" in schema["paths"]
 
 
-def test_demo_credentials_are_published_by_default(
-    anonymous: TestClient, settings: Settings
-) -> None:
-    response = anonymous.get(f"{API}/auth/demo-credentials")
+def test_credentials_are_published_by_default(anonymous: TestClient, settings: Settings) -> None:
+    response = anonymous.get(f"{API}/auth/published-credentials")
     assert response.status_code == 200
     assert response.json() == {"email": settings.demo_email, "password": PASSWORD}
 
 
-def test_demo_credentials_can_be_withheld(settings: Settings) -> None:
+def test_published_credentials_can_be_withheld(settings: Settings) -> None:
     app = create_app(settings.model_copy(update={"demo_credentials_public": False}))
     with TestClient(app) as client:
-        response = client.get(f"{API}/auth/demo-credentials")
+        response = client.get(f"{API}/auth/published-credentials")
     app.state.engine.dispose()
     assert response.status_code == 404
     assert response.json()["code"] == "NotFound"

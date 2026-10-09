@@ -133,21 +133,21 @@
         }
       }
     },
-    "/api/v1/auth/demo-credentials": {
+    "/api/v1/auth/published-credentials": {
       "get": {
         "tags": [
           "Authentication"
         ],
-        "summary": "Credentials of the public demo account",
-        "description": "Lets the sign-in page of a public demo show how to get in. Returns 404 when `R53_DEMO_CREDENTIALS_PUBLIC` is off.",
-        "operationId": "demo_credentials",
+        "summary": "Credentials the sign-in page may show",
+        "description": "Lets the sign-in page of a public deployment show how to get in. Returns 404 when `R53_DEMO_CREDENTIALS_PUBLIC` is off.",
+        "operationId": "published_credentials",
         "responses": {
           "200": {
             "description": "Successful Response",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DemoCredentials"
+                  "$ref": "#/components/schemas/PublishedCredentials"
                 }
               }
             }
@@ -1723,24 +1723,6 @@
         ],
         "title": "ChangeBatchResult"
       },
-      "DemoCredentials": {
-        "properties": {
-          "email": {
-            "type": "string",
-            "title": "Email"
-          },
-          "password": {
-            "type": "string",
-            "title": "Password"
-          }
-        },
-        "type": "object",
-        "required": [
-          "email",
-          "password"
-        ],
-        "title": "DemoCredentials"
-      },
       "ErrorDetail": {
         "properties": {
           "field": {
@@ -2315,6 +2297,24 @@
           "pages"
         ],
         "title": "Page[RecordSetOut]"
+      },
+      "PublishedCredentials": {
+        "properties": {
+          "email": {
+            "type": "string",
+            "title": "Email"
+          },
+          "password": {
+            "type": "string",
+            "title": "Password"
+          }
+        },
+        "type": "object",
+        "required": [
+          "email",
+          "password"
+        ],
+        "title": "PublishedCredentials"
       },
       "RecordSetInput": {
         "properties": {

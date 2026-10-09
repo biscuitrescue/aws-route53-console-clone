@@ -31,7 +31,7 @@ async function createZone(page: Page, label: string): Promise<Zone> {
   return { id: (await response.json()).id, name };
 }
 
-/** Empty a zone and delete it, so runs against a shared demo leave nothing behind. */
+/** Empty a zone and delete it, so runs against a shared deployment leave nothing behind. */
 async function removeZone(page: Page, zone: Zone) {
   const records = await (
     await page.request.get(`${API}/hostedzones/${zone.id}/records?page_size=500`)
@@ -252,7 +252,7 @@ test("header menus work and say what is only a placeholder", async ({ page }) =>
   await page.keyboard.press("Escape");
 
   await page.getByRole("button", { name: "CloudShell" }).first().click();
-  await expect(flash(page)).toContainText("CloudShell is not available in this demo");
+  await expect(flash(page)).toContainText("CloudShell is not available in this clone");
 
   await page.getByRole("button", { name: "Help & support" }).click();
   await page.getByRole("button", { name: "Keyboard shortcuts" }).click();

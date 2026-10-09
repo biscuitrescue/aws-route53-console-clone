@@ -34,7 +34,7 @@ like and how the clone was compared with it is written down in
 | ![Sign-in page](docs/screenshots/sign-in.png) | |
 
 **Live demo:** <https://35-208-96-233.sslip.io> (sign in with `demo@example.com` /
-`Route53Demo!`, or use the "Sign in as demo" button). API reference:
+`Route53Demo!`, or use the "Sign in with this account" button). API reference:
 <https://35-208-96-233.sslip.io/api/docs>.
 
 ## Contents
@@ -625,7 +625,7 @@ Registry repository, the backup bucket and the service account.
   resources to choose from.
 - Test record, query logging, DNSSEC signing and accelerated recovery are present in the
   UI and answer "coming soon". Amazon Q, CloudShell and the account pages of the header
-  answer "not available in this demo".
+  answer "not available in this clone".
 - With classic (non-overlay) scrollbars, the development server logs one React hydration
   warning from Cloudscape's table scrollbar, which measures the scrollbar only in the
   browser. Production builds are unaffected.
@@ -633,7 +633,7 @@ Registry repository, the backup bucket and the service account.
 - SQLite allows one writer at a time, which suits a single-VM demo, not a multi-instance
   deployment.
 - Deliberate visual differences from the real console (the fallback typeface, footer
-  text, the demo notice on the sign-in page) are listed with their reasons in
+  text, the notice on the sign-in page) are listed with their reasons in
   [docs/ui-spec.md](docs/ui-spec.md#13-deliberate-differences-from-the-real-console).
 - The frontend's lint tooling currently reports upstream `npm audit` advisories in
   development-only dependencies; nothing affected ships in the production image.

@@ -12,13 +12,13 @@ import { useNotify } from "./notifications";
 
 const REPOSITORY = "https://github.com/biscuitrescue/aws-route53-console-clone";
 
-/** What the footer's legal links say in a demo that has no legal department. */
+/** What the footer's legal links say in a clone that has no legal department. */
 function AboutModal({ onDismiss }: { onDismiss: () => void }) {
   return (
     <Modal
       visible
       onDismiss={onDismiss}
-      header="About this demo"
+      header="About this clone"
       footer={
         <Box float="right">
           <Button variant="primary" onClick={onDismiss}>
@@ -35,14 +35,14 @@ function AboutModal({ onDismiss }: { onDismiss: () => void }) {
         <div>
           <Box variant="h3">Privacy</Box>
           <Box variant="p">
-            The only account is a shared demo account. Hosted zones and records you create are
-            visible to everyone who signs in. Do not enter personal data or real credentials.
+            The only account is shared. Hosted zones and records you create are visible to everyone
+            who signs in. Do not enter personal data or real credentials.
           </Box>
         </div>
         <div>
           <Box variant="h3">Terms</Box>
           <Box variant="p">
-            The demo is provided as is, without any guarantee of availability, and its data may be
+            The clone is provided as is, without any guarantee of availability, and its data may be
             reset at any time.
           </Box>
         </div>
@@ -65,7 +65,7 @@ export function GlobalFooter() {
   const [aboutVisible, setAboutVisible] = useState(false);
 
   const notAvailable = (feature: string, detail: string) => () =>
-    notify.info(`${feature} is not available in this demo`, detail);
+    notify.info(`${feature} is not available in this clone`, detail);
   const about = () => setAboutVisible(true);
 
   return (

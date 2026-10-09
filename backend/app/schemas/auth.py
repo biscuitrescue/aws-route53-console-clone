@@ -22,6 +22,6 @@ class SessionOut(BaseModel):
     expires_at: datetime
 
 
-class DemoCredentials(BaseModel):
+class PublishedCredentials(BaseModel):
     email: str
     password: str
