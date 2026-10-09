@@ -30,8 +30,8 @@ jobs:
       run:
         working-directory: backend
     steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v6
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10
         with:
           version: ${{ env.UV_VERSION }}
           enable-cache: true
@@ -48,7 +48,7 @@ jobs:
         run: uv run pytest --junitxml=test-results/pytest.xml
       - name: Keep the test results
         if: ${{ !cancelled() }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: backend-test-results
           path: backend/test-results/
@@ -62,8 +62,8 @@ jobs:
       run:
         working-directory: frontend
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
@@ -88,13 +88,13 @@ jobs:
       BACKEND_URL: http://127.0.0.1:8000
       E2E_BASE_URL: http://127.0.0.1:3000
     steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v6
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10
         with:
           version: ${{ env.UV_VERSION }}
           enable-cache: true
           cache-dependency-glob: backend/uv.lock
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
@@ -110,9 +110,12 @@ jobs:
           uv run --no-dev python -m app.seed
       - name: Start the backend
         working-directory: backend
+        # Started from the virtualenv, not with `uv run`: a uv process left running holds
+        # the cache lock, and the setup-uv action cannot prune its cache when the job ends.
         run: |
-          nohup uv run --no-dev uvicorn --factory app.main:create_app \
+          nohup .venv/bin/uvicorn --factory app.main:create_app \
             --host 127.0.0.1 --port 8000 > "$GITHUB_WORKSPACE/backend.log" 2>&1 &
+          echo $! > "$RUNNER_TEMP/backend.pid"
 
       - name: Install frontend dependencies
         working-directory: frontend
@@ -143,9 +146,13 @@ jobs:
         working-directory: frontend
         run: npm run test:e2e
 
+      - name: Stop the backend
+        if: ${{ !cancelled() }}
+        run: kill "$(cat "$RUNNER_TEMP/backend.pid")" || true
+
       - name: Keep the report, traces and server logs
         if: ${{ !cancelled() }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: e2e-report
           path: |
