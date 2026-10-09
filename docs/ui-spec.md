@@ -301,7 +301,8 @@ scrolls horizontally with the sticky scrollbar (S52, S53).
 | The footer's copyright line names the clone, and Privacy, Terms and Cookie preferences open a note about the clone. | Same reason; there is no legal entity behind the clone. |
 | Amazon Q, CloudShell, Agent Toolkit, Language, Switch project, Projects, Team, Billing, Profile and Notification center answer with a "not available in this clone" notice. | They belong to the AWS console, not to Route 53; the brief allows mocking them. |
 | The account menu shows the account's ID and user instead of plan status and credits. | There is no billing. |
-| Record types SPF, NAPTR, DS, TLSA, SSHFP, HTTPS and SVCB, and the IP-based and Geoproximity routing policies, are listed but disabled. | Assignment scope: nine record types. |
+| The IP-based and Geoproximity routing policies are listed but disabled. | They depend on CIDR collections and on geographic coordinates or AWS Regions with a bias, neither of which the clone models. |
+| The placeholders of the Value field for SPF, NAPTR, DS, TLSA, SSHFP, HTTPS and SVCB are examples in each type's format, not the console's wording. | Those seven dropdown entries were captured (S33), their placeholders were not. |
 | Alias targets other than a record of the same zone are entered as a DNS name and hosted zone ID. | The clone has no AWS resources to list. |
 | The wizard's tiles have no illustrations, and its "Define record" dialog uses the quick-create fields without the console's longer field descriptions. | The illustrations are AWS artwork; the fields are shared with quick create. |
 | Filtering, sorting and pagination run in the API, not in the browser. | Assignment asks for a backend API; the visible behaviour is the same. |

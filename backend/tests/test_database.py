@@ -38,6 +38,10 @@ def test_migrations_can_be_reversed(tmp_path: Path) -> None:
     engine.dispose()
 
 
+# Position of `type` in a row of `record_sets`.
+_RECORD_TYPE_COLUMN = 4
+
+
 def _dump(database: Path, tables: list[str]) -> dict[str, list[tuple[object, ...]]]:
     engine = create_db_engine(f"sqlite:///{database}")
     with engine.connect() as connection:
@@ -69,16 +73,27 @@ def test_migrating_a_database_in_use_keeps_every_row(tmp_path: Path) -> None:
         "record_sets",
         "record_values",
     ]
-    before = _dump(database, tables)
-    assert len(before["hosted_zones"]) == 12
-    assert len(before["record_values"]) > 50
+    seeded = _dump(database, tables)
+    assert len(seeded["hosted_zones"]) == 12
+    assert len(seeded["record_values"]) > 50
+
+    # Going back to the first schema drops the record types it did not have, and only those.
+    first_types = ("A", "AAAA", "CAA", "CNAME", "MX", "NS", "PTR", "SOA", "SRV", "TXT")
+    kept_sets = [row for row in seeded["record_sets"] if row[_RECORD_TYPE_COLUMN] in first_types]
+    kept_ids = {row[0] for row in kept_sets}
+    assert 0 < len(seeded["record_sets"]) - len(kept_sets) < 10
+    expected = seeded | {
+        "record_sets": kept_sets,
+        "record_values": [row for row in seeded["record_values"] if row[0] in kept_ids],
+    }
 
     command.downgrade(config, "0001")
-    assert _dump(database, tables) == before
+    assert _dump(database, tables) == expected
     assert len(_dump(database, ["users"])["users"]) == 1
 
+    # Upgrading again rebuilds `users` and `record_sets` with rows that refer to them.
     command.upgrade(config, "head")
-    assert _dump(database, tables) == before
+    assert _dump(database, tables) == expected
     assert len(_dump(database, ["users"])["users"]) == 1
 
 

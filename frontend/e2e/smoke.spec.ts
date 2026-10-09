@@ -20,7 +20,17 @@ const RECORDS: { name: string; type: RecordType; value: string }[] = [
   { name: "10", type: "PTR", value: `www.${ZONE}` },
   { name: "_sip._tcp", type: "SRV", value: `10 60 5060 sip.${ZONE}` },
   { name: "", type: "CAA", value: '0 issue "amazon.com"' },
+  { name: "", type: "SPF", value: '"v=spf1 -all"' },
+  { name: "sip", type: "NAPTR", value: '100 10 "u" "sip+E2U" "!^.*$!sip:info@example.com!i" .' },
+  { name: "child", type: "DS", value: `12345 13 2 ${"ab".repeat(32)}` },
+  { name: "_443._tcp.www", type: "TLSA", value: `3 1 1 ${"cd".repeat(32)}` },
+  { name: "host", type: "SSHFP", value: `4 2 ${"ef".repeat(32)}` },
+  { name: "", type: "HTTPS", value: '1 . alpn="h3,h2" ipv4hint="192.0.2.10"' },
+  { name: "_dns", type: "SVCB", value: "1 doh.example.net. alpn=h2 port=443" },
 ];
+
+/** The zone's own NS and SOA plus one record of every type. */
+const ALL_RECORDS = RECORDS.length + 2;
 
 async function signIn(page: Page) {
   await page.getByLabel("Email address").fill(EMAIL);
@@ -69,7 +79,7 @@ test("sign in, manage a zone and its records, sign out", async ({ page }) => {
   }
   await page.getByRole("button", { name: "Create records" }).click();
   await expect(flash(page)).toContainText(`Records for ${ZONE} were successfully created.`);
-  await expect(page.getByRole("tab", { name: "Records (11)" })).toBeVisible();
+  await expect(page.getByRole("tab", { name: `Records (${ALL_RECORDS})` })).toBeVisible();
 
   // "View status" follows the change: PENDING at first, INSYNC a few seconds later. The
   // records are already listed while it is pending.
@@ -83,7 +93,7 @@ test("sign in, manage a zone and its records, sign out", async ({ page }) => {
   const filter = page.getByPlaceholder("Filter records by property or value");
   await filter.fill("www");
   await filter.press("Enter");
-  await expect(page.getByText("4 matches").first()).toBeVisible();
+  await expect(page.getByText("5 matches").first()).toBeVisible();
   await page.getByRole("button", { name: "Clear filters" }).first().click();
   await page.getByLabel("Filter by type").click();
   await page.getByRole("option", { name: "MX", exact: true }).click();
@@ -106,8 +116,8 @@ test("sign in, manage a zone and its records, sign out", async ({ page }) => {
   // Bulk delete everything except the zone's own NS and SOA.
   await page.reload();
   const rows = page.locator('table[aria-label="Records"] tbody tr');
-  await expect(rows).toHaveCount(11);
-  for (let index = 0; index < 11; index += 1) {
+  await expect(rows).toHaveCount(ALL_RECORDS);
+  for (let index = 0; index < ALL_RECORDS; index += 1) {
     const row = rows.nth(index);
     // The record name is the row header (a <th>); the type is the first data cell after the checkbox.
     const name = (await row.locator("th").innerText()).trim();
@@ -116,7 +126,9 @@ test("sign in, manage a zone and its records, sign out", async ({ page }) => {
     if (!isDefault) await row.locator("td").first().locator("label").click();
   }
   await page.getByRole("button", { name: "Delete records" }).click();
-  await expect(page.getByRole("dialog")).toContainText("Delete 9 selected records?");
+  await expect(page.getByRole("dialog")).toContainText(
+    `Delete ${RECORDS.length} selected records?`,
+  );
   await page.getByRole("dialog").getByRole("button", { name: "Delete" }).click();
   await expect(flash(page)).toContainText("The records were successfully deleted.");
   await expect(page.getByRole("tab", { name: "Records (2)" })).toBeVisible();

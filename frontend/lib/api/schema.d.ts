@@ -748,7 +748,7 @@ export interface components {
          * RecordType
          * @enum {string}
          */
-        RecordType: "A" | "AAAA" | "CAA" | "CNAME" | "MX" | "NS" | "PTR" | "SOA" | "SRV" | "TXT";
+        RecordType: "A" | "AAAA" | "CAA" | "CNAME" | "DS" | "HTTPS" | "MX" | "NAPTR" | "NS" | "PTR" | "SOA" | "SPF" | "SRV" | "SSHFP" | "SVCB" | "TLSA" | "TXT";
         /**
          * RoutingPolicy
          * @enum {string}

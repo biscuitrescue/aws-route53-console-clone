@@ -85,6 +85,40 @@ _SEED_ZONES: tuple[_SeedZone, ...] = (
             _record("_sip._tcp", RecordType.SRV, ["10 60 5060 sip.example.com"], 3600),
             _record("_dmarc", RecordType.TXT, ['"v=DMARC1; p=quarantine"'], 3600),
             _record("*.preview", RecordType.A, ["192.0.2.60"], 60),
+            _record("", RecordType.SPF, ['"v=spf1 include:_spf.example.com ~all"'], 3600),
+            _record("", RecordType.HTTPS, ['1 . alpn="h3,h2" ipv4hint="192.0.2.10"'], 3600),
+            _record("_dns.resolver", RecordType.SVCB, ['1 doh.example.com alpn="h2" port=443']),
+            _record(
+                "sip",
+                RecordType.NAPTR,
+                [
+                    '10 100 "S" "SIP+D2T" "" _sip._tcp.example.com',
+                    '20 100 "S" "SIP+D2U" "" _sip._udp.example.com',
+                ],
+                3600,
+            ),
+            # The DS of the delegated "dev" subdomain, next to its NS records.
+            _record(
+                "dev",
+                RecordType.DS,
+                ["12345 13 2 9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08"],
+                3600,
+            ),
+            _record(
+                "_443._tcp.www",
+                RecordType.TLSA,
+                ["3 1 1 d2abde240d7cd3ee6b4b28c54df034b97983a1d16e8a410e4561cb106618e971"],
+                3600,
+            ),
+            _record(
+                "bastion",
+                RecordType.SSHFP,
+                [
+                    "4 2 5e884898da28047151d0e56f8dc6292773603d0d6aabbdd62a11ef721d1542d8",
+                    "1 1 09f6a01d2175742b257c6b98b7c72c44c4040683",
+                ],
+                3600,
+            ),
             RecordSetInput(
                 name="cdn",
                 type=RecordType.A,

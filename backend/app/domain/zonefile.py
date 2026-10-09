@@ -130,6 +130,17 @@ def _quote(token: Token) -> str:
     return f'"{token.text}"'
 
 
+def _service_parameters(tokens: list[Token]) -> list[str]:
+    """Put `key="value"` back together: the tokenizer splits it at the opening quote."""
+    parameters: list[str] = []
+    for token in tokens:
+        if token.quoted and parameters and parameters[-1].endswith("="):
+            parameters[-1] += _quote(token)
+        else:
+            parameters.append(_quote(token) if token.quoted else token.text)
+    return parameters
+
+
 def _rdata(record_type: RecordType, tokens: list[Token], origin: str) -> str:
     """Build a Route 53 style value from zone-file rdata tokens."""
     if not tokens:
@@ -151,8 +162,27 @@ def _rdata(record_type: RecordType, tokens: list[Token], origin: str) -> str:
         case RecordType.CAA:
             _expect(tokens, 3, record_type)
             return f"{texts[0]} {texts[1]} {_quote(tokens[2])}"
-        case RecordType.TXT:
+        case RecordType.TXT | RecordType.SPF:
             return " ".join(_quote(token) for token in tokens)
+        case RecordType.NAPTR:
+            _expect(tokens, 6, record_type)
+            quoted = [_quote(token) for token in tokens[2:5]]
+            return " ".join([*texts[:2], *quoted, _absolute_target(texts[5], origin)])
+        case RecordType.DS | RecordType.TLSA:
+            # The digest may be written in several chunks; it is one field.
+            if len(tokens) < 4:
+                _expect(tokens, 4, record_type)
+            return " ".join([*texts[:3], "".join(texts[3:])])
+        case RecordType.SSHFP:
+            if len(tokens) < 3:
+                _expect(tokens, 3, record_type)
+            return " ".join([*texts[:2], "".join(texts[2:])])
+        case RecordType.SVCB | RecordType.HTTPS:
+            if len(tokens) < 2:
+                raise _LineError(f"{record_type} record data needs a priority and a target")
+            return " ".join(
+                [texts[0], _absolute_target(texts[1], origin), *_service_parameters(tokens[2:])]
+            )
         case RecordType.SOA:
             _expect(tokens, 7, record_type)
             timers = [str(parse_ttl(text)) for text in texts[2:]]
@@ -266,15 +296,22 @@ _TARGET_FIELD: dict[RecordType, tuple[int, ...]] = {
     RecordType.MX: (1,),
     RecordType.SRV: (3,),
     RecordType.SOA: (0, 1),
+    RecordType.SVCB: (1,),
+    RecordType.HTTPS: (1,),
 }
 
 
 def to_zone_file_value(record_type: RecordType, value: str) -> str:
     """Make host names inside a value absolute, as Route 53 always treats them as FQDNs."""
+    if record_type is RecordType.NAPTR:
+        # The replacement is the last field; the ones before it are quoted and may hold spaces.
+        head, _, replacement = value.rpartition(" ")
+        return value if replacement.endswith(".") else f"{head} {replacement.lower()}."
     positions = _TARGET_FIELD.get(record_type)
     if positions is None:
         return value
-    fields = value.split()
+    # Split no further than the last host name, so quoted text after it stays as written.
+    fields = value.split(maxsplit=max(positions) + 1)
     for position in positions:
         if position < len(fields) and not fields[position].endswith("."):
             fields[position] = f"{fields[position].lower()}."

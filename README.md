@@ -58,7 +58,7 @@ like and how the clone was compared with it is written down in
 |---|---|
 | Authentication | Mocked sign-in against a seeded demo account. Opaque session token in an httpOnly cookie, stored hashed, 14-day expiry, survives reloads, browser restarts and server restarts. A route guard sends visitors without a session to sign-in and back to where they were going. Every visitor works in a [private sandbox](#visitor-sandboxes), so nothing one visitor deletes is missing for the next. |
 | Hosted zones | List with property filter, sorting, pagination and preferences; details side panel; create (public or private with VPC associations, tags); edit description, tags and VPC associations in one atomic save; delete with typed confirmation and Route 53's "zone must be empty" rule. |
-| DNS records | A, AAAA, CNAME, TXT, MX, NS, PTR, SRV, CAA (plus the zone's SOA). Table with free-text and property filters, type / routing policy / alias quick filters, sorting, pagination, preferences; quick create for several records at once, or the two-step wizard (routing policy, then records); edit in the side panel; delete with a confirmation listing the records. Simple, weighted, latency, failover, geolocation and multivalue routing, and alias records. |
+| DNS records | A, AAAA, CNAME, TXT, MX, NS, PTR, SRV, CAA (plus the zone's SOA), and the other types the console offers: SPF, NAPTR, DS, TLSA, SSHFP, HTTPS, SVCB, each validated field by field. Table with free-text and property filters, type / routing policy / alias quick filters, sorting, pagination, preferences; quick create for several records at once, or the two-step wizard (routing policy, then records); edit in the side panel; delete with a confirmation listing the records. Simple, weighted, latency, failover, geolocation and multivalue routing, and alias records. |
 | Route 53 experience | The console's frame: global header (services menu, search with live results, CloudShell, notifications, help menu, account menu with Sign out), toolbar with breadcrumbs, side navigation, stacked flash notifications including the in-progress ones, help panel behind every "Info" link, side split panel, footer. Tables, forms, modals, empty and no-match states use the console's wording. Controls that belong to other AWS services say so instead of doing nothing. |
 | Route 53 behaviour | Every zone gets an apex NS (TTL 172800, four `awsdns` name servers) and SOA (TTL 900) that cannot be deleted. CNAMEs cannot sit at the apex or share a name with other records. Values are validated per type. Names accept the characters Route 53 lists; `*` is a wildcard only as the whole leftmost label and never for NS records. Routed records need a record ID, cannot mix policies at one name and type, allow one latency record per Region, one geolocation record per location and one primary and one secondary failover record, and share the last TTL given. Duplicate zone names are allowed and get distinct IDs. Error messages use Route 53's wording. Record changes get a change ID whose status goes from `PENDING` to `INSYNC`, as a [simulation](#change-status). |
 | Placeholders | Dashboard, Health checks, Profiles, Traffic policies, Resolver and the other navigation entries show a "Coming soon" page inside the full console frame. |
@@ -546,6 +546,25 @@ Content-Type: application/json
 }
 ```
 
+### Record value formats
+
+One entry of `values` is one line of the console's Value field. Besides the well-known
+types, these are accepted, each rejected with a Route 53 style message when a field is
+out of range:
+
+| Type | Format | Checks |
+|---|---|---|
+| `SPF` | `"text"` (one or more quoted strings, as for `TXT`) | Quoted; each string at most 255 characters |
+| `NAPTR` | `order preference "flags" "service" "regexp" replacement` | Order and preference 0 to 65535; flags, service and regexp quoted; flags letters or digits; replacement a domain name or `.` |
+| `DS` | `key-tag algorithm digest-type digest` | Key tag 0 to 65535; algorithm 0 to 255; digest type 1, 2 or 4 with a hexadecimal digest of 40, 64 or 96 digits. Not allowed at the zone apex |
+| `TLSA` | `usage selector matching-type data` | Usage 0 to 3; selector 0 or 1; matching type 0, 1 or 2; hexadecimal data of 64 digits for type 1 and 128 for type 2 |
+| `SSHFP` | `algorithm fingerprint-type fingerprint` | Algorithm 1, 2, 3, 4 or 6; type 1 or 2 with a hexadecimal fingerprint of 40 or 64 digits |
+| `HTTPS`, `SVCB` | `priority target [key=value ...]` | Priority 0 to 65535; target a domain name or `.`; priority 0 (alias form) takes no parameters; parameters `alpn`, `no-default-alpn`, `port`, `ipv4hint`, `ipv6hint`, `ech`, `mandatory` or `keyNNNNN`, each at most once and each with a value of its own form |
+
+Zone file import and both exports handle all of them: a digest split over several chunks or
+lines is joined, relative targets are made absolute, and a zone exported and imported again
+has the same records (`backend/tests/test_more_record_types.py`).
+
 ### Change status
 
 Route 53 answers a record change with a change ID whose status is `PENDING` until the
@@ -776,8 +795,11 @@ Registry repository, the backup bucket and the service account.
   not to a person.
 - Routing policies: simple, weighted, latency, failover, geolocation and multivalue answer
   are stored and validated. Geoproximity and IP-based routing are not implemented.
-- Record types are the nine in the assignment plus SOA; the console's other types (DS,
-  TLSA, SSHFP, HTTPS, SVCB, NAPTR, SPF) are listed but disabled.
+- All sixteen record types of the console's select can be created (the nine in the
+  assignment, plus SPF, NAPTR, DS, TLSA, SSHFP, HTTPS and SVCB), along with the zone's SOA.
+  Their values are checked for form only: a DS digest has to have the length its digest
+  type calls for, but nothing checks that it matches a real key, and DNSSEC signing itself
+  is not implemented.
 - Alias records can point at another record of the same zone by choosing it; any other
   alias target is entered as a DNS name and hosted zone ID, since there are no AWS
   resources to choose from.

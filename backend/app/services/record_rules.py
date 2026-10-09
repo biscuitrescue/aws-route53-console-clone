@@ -157,6 +157,13 @@ def draft_record(zone_name: str, payload: RecordSetInput) -> RecordDraft:
             field="type",
         )
 
+    if record_type is RecordType.DS and name == zone_name:
+        # A zone's own DS record belongs in its parent zone.
+        raise InvalidInputError(
+            f"RRSet of type DS with DNS name {name} is not permitted at apex in zone {zone_name}",
+            field="type",
+        )
+
     if record_type is RecordType.NS and is_wildcard(name):
         raise InvalidInputError("NS records cannot have a wildcard name", field="name")
 

@@ -8,7 +8,7 @@ interface RecordTypeInfo {
   placeholder: string;
 }
 
-/** The record types that can be created, in the console's order. */
+/** The record types that can be created, in the order of the console's select. */
 export const recordTypes: RecordTypeInfo[] = [
   {
     value: "A",
@@ -42,11 +42,48 @@ export const recordTypes: RecordTypeInfo[] = [
     placeholder: "1 10 5269 xmpp-server.example.com",
   },
   {
+    value: "SPF",
+    label: "SPF – Not recommended",
+    placeholder: '"v=spf1 ip4:192.168.0.1/16 -all"',
+  },
+  {
+    value: "NAPTR",
+    label: "NAPTR – Used by DDDS applications",
+    placeholder: '100 50 "u" "E2U+sip" "!^.*$!sip:information@example.com!i" .',
+  },
+  {
     value: "CAA",
     label: "CAA – Restricts CAs that can create SSL/TLS certificates for the domain",
     placeholder: '0 issue "amazon.com"',
   },
   { value: "NS", label: "NS – Name servers for a hosted zone", placeholder: "ns1.amazon.com" },
+  {
+    value: "DS",
+    label: "DS - Delegation Signer, used to establish a chain of trust for DNSSEC",
+    placeholder: "12345 3 1 123456789abcdef67890123456789abcdef67890",
+  },
+  {
+    value: "TLSA",
+    label:
+      "TLSA - Associates a TLS server certificate or public key with the domain name. DNSSEC required.",
+    placeholder: "3 1 1 d2abde240d7cd3ee6b4b28c54df034b97983a1d16e8a410e4561cb106618e971",
+  },
+  {
+    value: "SSHFP",
+    label: "SSHFP - Specifies the SSH key fingerprint and algorithm. DNSSEC required.",
+    placeholder: "1 1 09F6A01D2175742B257C6B98B7C72C44C4040683",
+  },
+  {
+    value: "HTTPS",
+    label:
+      "HTTPS - Provides connection optimization details like protocols, ports, and endpoints for efficient client-service communication.",
+    placeholder: '1 . alpn="h3,h2" ipv4hint="192.0.2.1"',
+  },
+  {
+    value: "SVCB",
+    label: "SVCB - Delivers extensible configuration information for accessing service endpoints.",
+    placeholder: '1 svc.example.com. alpn="h2" port=8443',
+  },
 ];
 
 /** SOA exists once per zone and can be edited but never created. */
@@ -58,56 +95,6 @@ export const soaType: RecordTypeInfo = {
 
 const UNSUPPORTED = "Not supported in this clone";
 
-/**
- * Types the console also lists. The clone does not store them, so the select shows them
- * disabled rather than leaving them out.
- */
-const unsupportedRecordTypes = [
-  { value: "SPF", label: "SPF – Not recommended" },
-  { value: "NAPTR", label: "NAPTR – Used by DDDS applications" },
-  {
-    value: "DS",
-    label: "DS - Delegation Signer, used to establish a chain of trust for DNSSEC",
-  },
-  {
-    value: "TLSA",
-    label:
-      "TLSA - Associates a TLS server certificate or public key with the domain name. DNSSEC required.",
-  },
-  {
-    value: "SSHFP",
-    label: "SSHFP - Specifies the SSH key fingerprint and algorithm. DNSSEC required.",
-  },
-  {
-    value: "HTTPS",
-    label:
-      "HTTPS - Provides connection optimization details like protocols, ports, and endpoints for efficient client-service communication.",
-  },
-  {
-    value: "SVCB",
-    label: "SVCB - Delivers extensible configuration information for accessing service endpoints.",
-  },
-];
-
-const TYPE_ORDER = [
-  "A",
-  "AAAA",
-  "CNAME",
-  "MX",
-  "TXT",
-  "PTR",
-  "SRV",
-  "SPF",
-  "NAPTR",
-  "CAA",
-  "NS",
-  "DS",
-  "TLSA",
-  "SSHFP",
-  "HTTPS",
-  "SVCB",
-];
-
 interface SelectOption {
   value: string;
   label: string;
@@ -116,12 +103,10 @@ interface SelectOption {
 }
 
 /** The "Record type" select: every type the console lists, in its order. */
-export const recordTypeOptions: SelectOption[] = TYPE_ORDER.flatMap((value): SelectOption[] => {
-  const supported = recordTypes.find((type) => type.value === value);
-  if (supported) return [{ value, label: supported.label }];
-  const other = unsupportedRecordTypes.find((type) => type.value === value);
-  return other ? [{ ...other, disabled: true, disabledReason: UNSUPPORTED }] : [];
-});
+export const recordTypeOptions: SelectOption[] = recordTypes.map(({ value, label }) => ({
+  value,
+  label,
+}));
 
 export function recordTypeInfo(type: RecordType): RecordTypeInfo {
   return recordTypes.find((candidate) => candidate.value === type) ?? soaType;
@@ -129,15 +114,7 @@ export function recordTypeInfo(type: RecordType): RecordTypeInfo {
 
 /** Every type the records table can filter by, in the console's order. */
 export const filterableRecordTypes: RecordType[] = [
-  "A",
-  "AAAA",
-  "CNAME",
-  "MX",
-  "TXT",
-  "PTR",
-  "SRV",
-  "CAA",
-  "NS",
+  ...recordTypes.map((type) => type.value),
   "SOA",
 ];
 
