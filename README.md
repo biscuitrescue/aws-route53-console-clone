@@ -27,7 +27,9 @@ match it closely.
 |---|---|
 | ![Zone file import with preview](docs/screenshots/import-zone-file.png) | ![Sign-in page](docs/screenshots/sign-in.png) |
 
-> **Live demo:** added once the Google Cloud deployment is up.
+**Live demo:** <https://35-208-96-233.sslip.io> (sign in with `demo@example.com` /
+`Route53Demo!`, or use the "Sign in as demo" button). API reference:
+<https://35-208-96-233.sslip.io/api/docs>.
 
 ## Contents
 
@@ -546,7 +548,9 @@ PROJECT_ID=<PROJECT_ID> DEMO_PASSWORD='<password for the demo account>' ./deploy
 
 `deploy.sh` builds both images with Cloud Build (tagged with the git commit), uploads the
 Compose file, Caddyfile and environment to the VM, pulls and restarts the stack, and
-smoke-tests `https://<site>/api/v1/health`. Use `BUILD=local` to build and push with your
+smoke-tests `https://<site>/api/v1/health`. A full deploy takes about six minutes, most of
+it the two image builds. While the backend container restarts (about ten seconds, for the
+migration and seed), API calls fail; the data is untouched. Use `BUILD=local` to build and push with your
 own Docker, or `BUILD=skip IMAGE_TAG=<tag>` to roll back to an earlier image.
 
 On Windows, run the scripts from Git Bash or WSL.

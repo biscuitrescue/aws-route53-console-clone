@@ -61,8 +61,11 @@ if [[ "${ENABLE_BACKUPS}" == "1" ]]; then
     gcloud storage buckets update "gs://${BACKUP_BUCKET}" --lifecycle-file "${lifecycle}"
     rm -f "${lifecycle}"
   fi
-  gcloud storage buckets add-iam-policy-binding "gs://${BACKUP_BUCKET}" \
-    --member "serviceAccount:${SERVICE_ACCOUNT}" --role roles/storage.objectCreator >/dev/null
+  # Upload needs create, and `gcloud storage cp` also reads the object's metadata.
+  for role in roles/storage.objectCreator roles/storage.objectViewer; do
+    gcloud storage buckets add-iam-policy-binding "gs://${BACKUP_BUCKET}" \
+      --member "serviceAccount:${SERVICE_ACCOUNT}" --role "${role}" >/dev/null
+  done
 fi
 
 log "Static external IP ${ADDRESS_NAME}"
