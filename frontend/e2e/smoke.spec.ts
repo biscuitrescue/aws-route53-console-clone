@@ -107,7 +107,7 @@ test("sign in, manage a zone and its records, sign out", async ({ page }) => {
     const isDefault = name === ZONE && ["NS", "SOA"].includes(type);
     if (!isDefault) await row.locator("td").first().locator("label").click();
   }
-  await page.getByRole("button", { name: "Delete record" }).click();
+  await page.getByRole("button", { name: "Delete records" }).click();
   await expect(page.getByRole("dialog")).toContainText("Delete 9 selected records?");
   await page.getByRole("dialog").getByRole("button", { name: "Delete" }).click();
   await expect(flash(page)).toContainText("The records were successfully deleted.");
