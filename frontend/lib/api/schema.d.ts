@@ -30,7 +30,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Sign in and start a session */
+        /**
+         * Sign in and start a session
+         * @description Repeated failures from one address are throttled: the answer is then 429 with a `Retry-After` header, whether or not the account exists.
+         */
         post: operations["login"];
         delete?: never;
         options?: never;
@@ -875,6 +878,15 @@ export interface operations {
             };
             /** @description The request body or parameters are malformed */
             422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Too many failed attempts; see `Retry-After` */
+            429: {
                 headers: {
                     [name: string]: unknown;
                 };

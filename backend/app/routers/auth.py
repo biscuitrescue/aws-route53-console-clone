@@ -1,8 +1,15 @@
 from fastapi import APIRouter, Response, status
 
-from app.dependencies import CurrentSession, DbSession, SessionToken, SettingsDep
-from app.errors import NotFoundError
-from app.routers.responses import BAD_REQUEST, NOT_FOUND, UNAUTHORIZED
+from app.dependencies import (
+    ClientAddress,
+    CurrentSession,
+    DbSession,
+    LoginThrottleDep,
+    SessionToken,
+    SettingsDep,
+)
+from app.errors import NotFoundError, UnauthorizedError
+from app.routers.responses import BAD_REQUEST, NOT_FOUND, TOO_MANY_REQUESTS, UNAUTHORIZED
 from app.schemas.auth import LoginRequest, PublishedCredentials, SessionOut, UserOut
 from app.services import auth as auth_service
 
@@ -12,12 +19,26 @@ router = APIRouter(prefix="/auth", tags=["Authentication"])
 @router.post(
     "/login",
     summary="Sign in and start a session",
-    responses={**UNAUTHORIZED, **BAD_REQUEST},
+    description="Repeated failures from one address are throttled: the answer is then 429 "
+    "with a `Retry-After` header, whether or not the account exists.",
+    responses={**UNAUTHORIZED, **BAD_REQUEST, **TOO_MANY_REQUESTS},
 )
 def login(
-    payload: LoginRequest, response: Response, db: DbSession, settings: SettingsDep
+    payload: LoginRequest,
+    response: Response,
+    db: DbSession,
+    settings: SettingsDep,
+    throttle: LoginThrottleDep,
+    client: ClientAddress,
 ) -> SessionOut:
-    token, session = auth_service.login(db, settings, payload.email, payload.password)
+    throttle.check(client, payload.email)
+    try:
+        user = auth_service.verify_credentials(db, payload.email, payload.password)
+    except UnauthorizedError:
+        throttle.record_failure(client, payload.email)
+        raise
+    throttle.record_success(client, payload.email)
+    token, session = auth_service.open_session(db, settings, user)
     response.set_cookie(
         key=settings.session_cookie_name,
         value=token,

@@ -71,11 +71,6 @@ def open_session(db: Session, settings: Settings, user: User) -> tuple[str, Auth
     return token, session
 
 
-def login(db: Session, settings: Settings, email: str, password: str) -> tuple[str, AuthSession]:
-    """Check credentials and open a session; returns the raw token for the cookie."""
-    return open_session(db, settings, verify_credentials(db, email, password))
-
-
 def authenticate(db: Session, token: str | None) -> AuthSession:
     """Resolve a cookie token to its live session or raise ``UnauthorizedError``."""
     if not token:

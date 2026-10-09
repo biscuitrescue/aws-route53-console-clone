@@ -23,7 +23,11 @@ def _body(code: str, message: str, details: list[dict[str, Any]] | None = None) 
 
 async def _handle_app_error(_request: Request, exc: Exception) -> JSONResponse:
     assert isinstance(exc, AppError)
-    return JSONResponse(_body(exc.code, exc.message, exc.details), status_code=exc.status_code)
+    return JSONResponse(
+        _body(exc.code, exc.message, exc.details),
+        status_code=exc.status_code,
+        headers=exc.headers,
+    )
 
 
 async def _handle_validation_error(_request: Request, exc: Exception) -> JSONResponse:

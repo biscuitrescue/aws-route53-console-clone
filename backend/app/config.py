@@ -16,6 +16,15 @@ class Settings(BaseSettings):
     session_ttl_hours: int = 24 * 14
     cookie_secure: bool = False
 
+    # Failed sign-ins allowed per client address and account, and per client address
+    # across all accounts, within the window. Zero turns a limit off.
+    login_max_failures: int = 5
+    login_max_failures_per_client: int = 20
+    login_failure_window_seconds: int = 300
+    # Origins besides the app's own that may send state-changing requests, for example
+    # a frontend served from another host. Empty for the same-origin deployment.
+    trusted_origins: list[str] = []
+
     demo_email: str = "demo@example.com"
     demo_password: str = "Route53Demo!"
     demo_display_name: str = "demo-admin"

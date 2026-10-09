@@ -16,9 +16,11 @@ class AppError(Exception):
         code: str | None = None,
         field: str | None = None,
         details: list[ErrorDetail] | None = None,
+        headers: dict[str, str] | None = None,
     ) -> None:
         super().__init__(message)
         self.message = message
+        self.headers = headers
         if code is not None:
             self.code = code
         self.field = field
@@ -50,6 +52,16 @@ class InvalidZoneFileError(AppError):
 class UnauthorizedError(AppError):
     status_code = 401
     code = "Unauthorized"
+
+
+class TooManyRequestsError(AppError):
+    status_code = 429
+    code = "Throttling"
+
+    def __init__(self, message: str, *, retry_after: float) -> None:
+        # Rounded up, so a client that waits this long is certain to be let through.
+        seconds = max(1, int(-(-retry_after // 1)))
+        super().__init__(message, headers={"Retry-After": str(seconds)})
 
 
 class NotFoundError(AppError):

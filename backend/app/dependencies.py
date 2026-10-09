@@ -11,6 +11,7 @@ from app.models import AuthSession, HostedZone, User
 from app.repositories.hosted_zones import ZoneRow
 from app.services import auth as auth_service
 from app.services import hosted_zones as zone_service
+from app.services.throttle import LoginThrottle
 
 
 def get_settings(request: Request) -> Settings:
@@ -25,6 +26,28 @@ def get_db(request: Request) -> Iterator[Session]:
 
 SettingsDep = Annotated[Settings, Depends(get_settings)]
 DbSession = Annotated[Session, Depends(get_db)]
+
+
+def get_login_throttle(request: Request) -> LoginThrottle:
+    throttle: LoginThrottle = request.app.state.login_throttle
+    return throttle
+
+
+LoginThrottleDep = Annotated[LoginThrottle, Depends(get_login_throttle)]
+
+
+def get_client_address(request: Request) -> str:
+    """The address the request came from.
+
+    Taken from the connection. Behind the reverse proxy, uvicorn replaces it with the
+    address in ``X-Forwarded-For``, and only for proxies it was told to trust
+    (``--forwarded-allow-ips``); the application never reads that header itself, so a
+    client cannot choose its own identity.
+    """
+    return request.client.host if request.client else "unknown"
+
+
+ClientAddress = Annotated[str, Depends(get_client_address)]
 
 
 def get_session_token(request: Request, settings: SettingsDep) -> str | None:

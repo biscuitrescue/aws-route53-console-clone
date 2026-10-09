@@ -10,7 +10,9 @@ from fastapi.routing import APIRoute
 from app.config import Settings, get_settings
 from app.db import create_db_engine, create_session_factory
 from app.error_handlers import register_error_handlers
+from app.middleware import SameOriginMiddleware
 from app.routers import auth, health, hosted_zones, records, transfer
+from app.services.throttle import LoginThrottle
 
 API_PREFIX = "/api/v1"
 DOCS_URL = "/api/docs"
@@ -51,7 +53,13 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.settings = settings
     app.state.engine = engine
     app.state.session_factory = create_session_factory(engine)
+    app.state.login_throttle = LoginThrottle(
+        max_failures=settings.login_max_failures,
+        max_failures_per_client=settings.login_max_failures_per_client,
+        window=settings.login_failure_window_seconds,
+    )
     register_error_handlers(app)
+    app.add_middleware(SameOriginMiddleware, trusted_origins=settings.trusted_origins)
 
     api = APIRouter(prefix=API_PREFIX)
     for module in (health, auth, hosted_zones, records, transfer):

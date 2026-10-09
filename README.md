@@ -47,6 +47,7 @@ like and how the clone was compared with it is written down in
 - [Architecture](#architecture)
 - [Database schema](#database-schema)
 - [API overview](#api-overview)
+- [Security](#security)
 - [Deployment on Google Cloud](#deployment-on-google-cloud)
 - [Known limitations](#known-limitations)
 
@@ -144,6 +145,10 @@ Every variable is optional. Copy `backend/.env.example` to `backend/.env` and
 | `R53_SESSION_COOKIE_NAME` | `r53_session` | Name of the session cookie |
 | `R53_SESSION_TTL_HOURS` | `336` | Session lifetime (14 days) |
 | `R53_COOKIE_SECURE` | `false` | Set to `true` when serving over HTTPS |
+| `R53_LOGIN_MAX_FAILURES` | `5` | Failed sign-ins allowed per client address and account within the window; `0` turns the limit off |
+| `R53_LOGIN_MAX_FAILURES_PER_CLIENT` | `20` | Failed sign-ins allowed per client address across all accounts |
+| `R53_LOGIN_FAILURE_WINDOW_SECONDS` | `300` | Length of that window |
+| `R53_TRUSTED_ORIGINS` | `[]` | JSON list of other origins allowed to send state-changing requests; needed only if the frontend is served from a different host than the API |
 | `R53_DEMO_EMAIL`, `R53_DEMO_PASSWORD`, `R53_DEMO_DISPLAY_NAME`, `R53_DEMO_ACCOUNT_ID` | see `.env.example` | The seeded demo account |
 | `R53_SEED_DEMO_DATA` | `true` | Create the sample zones when the demo account has none |
 | `BACKEND_URL` (frontend) | `http://127.0.0.1:8000` | Where Next.js proxies `/api/*` (read at build or dev-server start) and where the sign-in page asks for the published credentials (read when the server runs) |
@@ -538,9 +543,51 @@ request `field`, the `index` of the failing change in a batch, or the zone file 
 |---|---|---|
 | 400 | A Route 53 rule is violated | `InvalidInput`, `InvalidDomainName`, `InvalidChangeBatch`, `InvalidZoneFile` |
 | 401 | No session, or it expired | `Unauthorized`, `SessionExpired`, `AuthFailure` |
+| 403 | A state-changing request came from a page of another origin | `CrossOriginRequest` |
 | 404 | Unknown zone or record | `NoSuchHostedZone`, `NoSuchRecordSet` |
 | 409 | The change conflicts with existing data, or two requests raced each other | `RecordSetAlreadyExists`, `RecordSetConflict`, `HostedZoneNotEmpty`, `PriorRequestNotComplete` |
 | 422 | The request is malformed | `ValidationError` |
+| 429 | Too many failed sign-ins; `Retry-After` says how long to wait | `Throttling` |
+
+## Security
+
+Authentication is mocked, so this is not a claim of production security. What is in place:
+
+- **Session cookie.** `HttpOnly`, `SameSite=Lax`, `Secure` in production, 14-day lifetime.
+  The server stores only the SHA-256 of the token.
+- **Sign-in throttling.** After 5 failed sign-ins for one account from one client address
+  within 5 minutes, or 20 for any accounts from one address, further attempts get `429`
+  with a `Retry-After` header until the oldest failure leaves the window. The answer is
+  the same whether or not the account exists, a successful sign-in clears the count, and
+  the count is per address, so nobody can lock other visitors out of the shared account.
+  The address comes from the connection, which uvicorn fills from `X-Forwarded-For` only
+  for the proxy it is told to trust; in the deployment that header is written by Caddy,
+  which discards whatever the client sent.
+- **Cross-origin requests.** `SameSite=Lax` keeps the cookie off requests from other
+  *sites*, but the live host is a subdomain of `sslip.io`, which is not on the public
+  suffix list, so every other `*.sslip.io` page counts as the same site. The API therefore
+  also refuses any `POST`, `PUT`, `PATCH` or `DELETE` that a browser marks as coming from
+  another origin (`Sec-Fetch-Site`, with `Origin` compared against the host as the
+  fallback for older browsers). Requests carrying neither header are not from a browser
+  page and are let through, so scripts and `curl` work. There is no CORS configuration,
+  and a JSON body sent as `text/plain` (the one cross-site `POST` that needs no preflight)
+  is rejected.
+- **Passwords** are hashed with Argon2id; an unknown account takes the same time to
+  reject as a wrong password.
+- **Response headers** from Caddy: HSTS, `X-Content-Type-Options: nosniff`,
+  `X-Frame-Options: DENY`, a strict `Referrer-Policy`.
+
+Known limits:
+
+- The throttle counts in the memory of the one backend process. A restart forgets the
+  counts, and with several workers each would count on its own; a shared store such as
+  Redis would be the fix, and this deployment has neither several workers nor Redis.
+- There is no per-account lockout across addresses, by choice: with a published password
+  it would let anyone lock the account for everyone.
+- There is no CSRF token. The origin check above covers the same ground for browsers
+  that send `Sec-Fetch-Site` or `Origin`, which every current browser does.
+- No Content-Security-Policy is set.
+- The one account's password is public by design, there is no MFA, and there are no roles.
 
 ## Deployment on Google Cloud
 

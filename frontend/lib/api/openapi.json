@@ -33,6 +33,7 @@
           "Authentication"
         ],
         "summary": "Sign in and start a session",
+        "description": "Repeated failures from one address are throttled: the answer is then 429 with a `Retry-After` header, whether or not the account exists.",
         "operationId": "login",
         "requestBody": {
           "content": {
@@ -77,6 +78,16 @@
           },
           "422": {
             "description": "The request body or parameters are malformed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many failed attempts; see `Retry-After`",
             "content": {
               "application/json": {
                 "schema": {

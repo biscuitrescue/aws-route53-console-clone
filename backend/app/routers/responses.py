@@ -26,6 +26,10 @@ CONFLICT: dict[int | str, dict[str, Any]] = {
     409: {"model": ErrorResponse, "description": "The change conflicts with existing data"},
 }
 
+TOO_MANY_REQUESTS: dict[int | str, dict[str, Any]] = {
+    429: {"model": ErrorResponse, "description": "Too many failed attempts; see `Retry-After`"},
+}
+
 PageNumber = Annotated[int, Query(ge=1, description="1-based page number")]
 PageSize = Annotated[int, Query(ge=1, le=MAX_PAGE_SIZE, description="Items per page")]
 Search = Annotated[
