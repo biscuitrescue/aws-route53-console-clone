@@ -44,6 +44,10 @@ class Settings(BaseSettings):
     # New sandboxes one client address may start per hour. Zero turns the limit off.
     sandbox_creations_per_hour: int = 60
 
+    # How long a record change reports PENDING before INSYNC. Nothing is propagated, as
+    # no DNS is served; this only reproduces the console's two states.
+    change_propagation_seconds: int = 10
+
     # Route 53's own default quotas. Zero turns a limit off.
     max_hosted_zones: int = 500
     max_records_per_zone: int = 10_000

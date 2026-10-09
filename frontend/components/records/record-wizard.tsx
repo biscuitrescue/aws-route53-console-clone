@@ -173,7 +173,7 @@ export function RecordWizard({ zone, onSwitchToQuickCreate }: RecordWizardProps)
       drafts.map((draft) => ({ action: "CREATE" as const, record_set: draftToInput(draft) })),
       {
         onSuccess: (result) => {
-          notify.recordsChanged(createdRecordsHeader(result, zoneName));
+          notify.recordsChanged(createdRecordsHeader(result, zoneName), result.id);
           router.push(routes.hostedZone(zone.id));
         },
         onError: notify.error,

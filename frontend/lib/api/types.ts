@@ -21,6 +21,7 @@ export type RecordSetInput = Schemas["RecordSetInput"];
 export type RecordSetUpdate = Schemas["RecordSetUpdate"];
 export type Change = Schemas["Change"];
 export type ChangeBatchResult = Schemas["ChangeBatchResult"];
+export type ChangeInfo = Schemas["ChangeInfo"];
 
 export type ZoneFileImportResult = Schemas["ZoneFileImportResult"];
 export type ImportedRecordSet = Schemas["ImportedRecordSet"];

@@ -6,10 +6,12 @@ from sqlalchemy.orm import Session
 
 from app.domain.enums import RecordType
 from app.errors import NotFoundError
-from app.models import HostedZone, RecordSet
+from app.models import Change, HostedZone, RecordSet
 from app.repositories import records as record_repository
 from app.repositories.filtering import parse_filter
-from app.schemas.record_set import Change, RecordSetInput, RecordSetOut, RecordSetUpdate
+from app.schemas.record_set import Change as BatchChange
+from app.schemas.record_set import RecordSetInput, RecordSetOut, RecordSetUpdate
+from app.services import changes as change_service
 from app.services import record_rules
 from app.services.change_batch import BatchOutcome, apply_change_batch
 
@@ -55,7 +57,7 @@ def get_record(db: Session, zone: HostedZone, record_id: str) -> RecordSet:
 
 def create_record(
     db: Session, zone: HostedZone, payload: RecordSetInput, *, max_records: int = 0
-) -> RecordSet:
+) -> tuple[RecordSet, Change]:
     draft = record_rules.draft_record(zone.name, payload)
     record_rules.check_conflicts(db, zone, draft)
     record = record_rules.build_record(zone.id, draft)
@@ -63,8 +65,9 @@ def create_record(
     record_rules.align_group_ttl(db, zone, draft, record.id)
     db.flush()
     record_rules.ensure_within_quota(db, zone, max_records)
+    change = change_service.record(db, zone)
     db.commit()
-    return record
+    return record, change
 
 
 def _merge(record: RecordSet, changes: RecordSetUpdate) -> RecordSetInput:
@@ -81,7 +84,7 @@ def _merge(record: RecordSet, changes: RecordSetUpdate) -> RecordSetInput:
 
 def update_record(
     db: Session, zone: HostedZone, record_id: str, changes: RecordSetUpdate
-) -> RecordSet:
+) -> tuple[RecordSet, Change]:
     record = get_record(db, zone, record_id)
     draft = record_rules.draft_record(zone.name, _merge(record, changes))
     identity_changed = (draft.name, draft.type.value, draft.set_identifier) != (
@@ -94,21 +97,30 @@ def update_record(
     record_rules.check_conflicts(db, zone, draft, exclude_id=record.id)
     record_rules.apply_draft(record, draft)
     record_rules.align_group_ttl(db, zone, draft, record.id)
+    change = change_service.record(db, zone)
     db.commit()
-    return record
+    return record, change
 
 
-def delete_record(db: Session, zone: HostedZone, record_id: str) -> None:
+def delete_record(db: Session, zone: HostedZone, record_id: str) -> Change:
     record = get_record(db, zone, record_id)
     record_rules.ensure_not_required(zone.name, record)
     db.delete(record)
+    change = change_service.record(db, zone)
     db.commit()
+    return change
 
 
 def apply_batch(
-    db: Session, zone: HostedZone, changes: Sequence[Change], *, max_records: int = 0
+    db: Session,
+    zone: HostedZone,
+    changes: Sequence[BatchChange],
+    *,
+    comment: str = "",
+    max_records: int = 0,
 ) -> BatchOutcome:
     outcome = apply_change_batch(db, zone, changes)
     record_rules.ensure_within_quota(db, zone, max_records)
+    outcome.change = change_service.record(db, zone, comment)
     db.commit()
     return outcome

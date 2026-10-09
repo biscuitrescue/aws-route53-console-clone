@@ -106,8 +106,11 @@ function ImportZoneFileForm({ zone }: { zone: HostedZone }) {
     importFile.mutate(
       { content, dryRun: false, replaceExisting },
       {
-        onSuccess: () => {
-          notify.recordsChanged(`Records for ${zoneName} were successfully created.`);
+        onSuccess: (result) => {
+          notify.recordsChanged(
+            `Records for ${zoneName} were successfully created.`,
+            result.change_id,
+          );
           router.push(routes.hostedZone(zone.id));
         },
         onError: notify.error,

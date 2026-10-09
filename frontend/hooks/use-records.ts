@@ -68,16 +68,34 @@ export function useCreateRecord(zoneId: string) {
   });
 }
 
+/** Header in which the single-record routes name the change they made. */
+const CHANGE_ID_HEADER = "X-Change-Id";
+
 export function useUpdateRecord(zoneId: string) {
   return useMutation({
-    mutationFn: ({ recordId, changes }: { recordId: string; changes: RecordSetUpdate }) =>
-      unwrap(
-        api.PATCH("/api/v1/hostedzones/{zone_id}/records/{record_id}", {
-          params: { path: { zone_id: zoneId, record_id: recordId } },
-          body: changes,
-        }),
-      ),
+    mutationFn: async ({ recordId, changes }: { recordId: string; changes: RecordSetUpdate }) => {
+      const request = api.PATCH("/api/v1/hostedzones/{zone_id}/records/{record_id}", {
+        params: { path: { zone_id: zoneId, record_id: recordId } },
+        body: changes,
+      });
+      const record = await unwrap(request);
+      return { record, changeId: (await request).response.headers.get(CHANGE_ID_HEADER) };
+    },
     onSuccess: useInvalidateZone(zoneId),
+  });
+}
+
+/**
+ * The status of a record change, asked for again every two seconds while it is PENDING.
+ * The backend simulates the wait; see `GET /api/v1/changes/{change_id}`.
+ */
+export function useChangeStatus(changeId: string) {
+  return useQuery({
+    queryKey: queryKeys.change(changeId),
+    queryFn: () =>
+      unwrap(api.GET("/api/v1/changes/{change_id}", { params: { path: { change_id: changeId } } })),
+    refetchInterval: (query) => (query.state.data?.status === "PENDING" ? 2000 : false),
+    staleTime: 0,
   });
 }
 

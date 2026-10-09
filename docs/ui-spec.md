@@ -307,6 +307,7 @@ scrolls horizontally with the sticky scrollbar (S52, S53).
 | Filtering, sorting and pagination run in the API, not in the browser. | Assignment asks for a backend API; the visible behaviour is the same. |
 | Extra actions: "Export zone" on the zone page, bulk TTL edit in the panel when several records are selected, "Or upload a zone file" and "Replace existing records" on import, a "Result" column and an error list in the import preview, Keyboard shortcuts and API reference in the help menu. | Bonus features the real console lacks. |
 | Test record, Configure query logging, DNSSEC signing and Accelerated recovery are present and answer "coming soon". | Outside the assignment scope. |
+| "View status" adds a flash reading "Status: PENDING" and, about ten seconds later, "Status: INSYNC", each with the change ID and the time it was submitted. | The console's view of a change's status was not captured, and the clone does not propagate anything: the status is a timer on the server, and the flash states only what the API returned. |
 | The search-mode preference is shown but has no effect. | The API always searches every field. |
 | The help panel has no "Was this content helpful?" row. | Nothing would receive the answer. |
 

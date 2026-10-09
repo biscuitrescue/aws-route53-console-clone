@@ -42,3 +42,6 @@ class ZoneFileImportResult(BaseModel):
     summary: ImportSummary
     record_sets: list[ImportedRecordSet]
     errors: list[ErrorDetail] = Field(description="Syntax errors, by zone file line")
+    change_id: str | None = Field(
+        default=None, description="ID of the change that imported the records; none for a preview"
+    )

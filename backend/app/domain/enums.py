@@ -45,6 +45,11 @@ class FailoverRole(StrEnum):
     SECONDARY = "SECONDARY"
 
 
+class ChangeStatus(StrEnum):
+    PENDING = "PENDING"
+    INSYNC = "INSYNC"
+
+
 class ChangeAction(StrEnum):
     CREATE = "CREATE"
     UPSERT = "UPSERT"

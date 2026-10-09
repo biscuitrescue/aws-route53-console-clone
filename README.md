@@ -60,7 +60,7 @@ like and how the clone was compared with it is written down in
 | Hosted zones | List with property filter, sorting, pagination and preferences; details side panel; create (public or private with VPC associations, tags); edit description, tags and VPC associations in one atomic save; delete with typed confirmation and Route 53's "zone must be empty" rule. |
 | DNS records | A, AAAA, CNAME, TXT, MX, NS, PTR, SRV, CAA (plus the zone's SOA). Table with free-text and property filters, type / routing policy / alias quick filters, sorting, pagination, preferences; quick create for several records at once, or the two-step wizard (routing policy, then records); edit in the side panel; delete with a confirmation listing the records. Simple, weighted, latency, failover, geolocation and multivalue routing, and alias records. |
 | Route 53 experience | The console's frame: global header (services menu, search with live results, CloudShell, notifications, help menu, account menu with Sign out), toolbar with breadcrumbs, side navigation, stacked flash notifications including the in-progress ones, help panel behind every "Info" link, side split panel, footer. Tables, forms, modals, empty and no-match states use the console's wording. Controls that belong to other AWS services say so instead of doing nothing. |
-| Route 53 behaviour | Every zone gets an apex NS (TTL 172800, four `awsdns` name servers) and SOA (TTL 900) that cannot be deleted. CNAMEs cannot sit at the apex or share a name with other records. Values are validated per type. Names accept the characters Route 53 lists; `*` is a wildcard only as the whole leftmost label and never for NS records. Routed records need a record ID, cannot mix policies at one name and type, allow one latency record per Region, one geolocation record per location and one primary and one secondary failover record, and share the last TTL given. Duplicate zone names are allowed and get distinct IDs. Error messages use Route 53's wording. |
+| Route 53 behaviour | Every zone gets an apex NS (TTL 172800, four `awsdns` name servers) and SOA (TTL 900) that cannot be deleted. CNAMEs cannot sit at the apex or share a name with other records. Values are validated per type. Names accept the characters Route 53 lists; `*` is a wildcard only as the whole leftmost label and never for NS records. Routed records need a record ID, cannot mix policies at one name and type, allow one latency record per Region, one geolocation record per location and one primary and one secondary failover record, and share the last TTL given. Duplicate zone names are allowed and get distinct IDs. Error messages use Route 53's wording. Record changes get a change ID whose status goes from `PENDING` to `INSYNC`, as a [simulation](#change-status). |
 | Placeholders | Dashboard, Health checks, Profiles, Traffic policies, Resolver and the other navigation entries show a "Coming soon" page inside the full console frame. |
 | Bonus: import | BIND zone file import (paste or upload) with a live dry-run preview that reports syntax errors by line and rule violations per record, and an option to replace existing records. |
 | Bonus: export | "Export zone" on the zone page downloads a BIND zone file or JSON in the AWS CLI's `list-resource-record-sets` shape. |
@@ -154,6 +154,7 @@ Every variable is optional. Copy `backend/.env.example` to `backend/.env` and
 | `R53_SEED_DEMO_DATA` | `true` | Create the sample zones when they do not exist yet |
 | `R53_DEMO_SANDBOX` | `true` | Give each visitor of the demo account a private copy of the sample zones; see [Visitor sandboxes](#visitor-sandboxes) |
 | `R53_SANDBOX_IDLE_DAYS`, `R53_SANDBOX_MAX`, `R53_SANDBOX_CREATIONS_PER_HOUR` | `14`, `500`, `60` | When sandboxes are deleted, how many may exist, and how many one address may start per hour |
+| `R53_CHANGE_PROPAGATION_SECONDS` | `10` | How long a record change reports `PENDING` before `INSYNC`; see [Change status](#change-status) |
 | `R53_MAX_HOSTED_ZONES`, `R53_MAX_RECORDS_PER_ZONE` | `500`, `10000` | Quotas per account and per zone (Route 53's defaults); the live deployment sets 50 and 1000 |
 | `BACKEND_URL` (frontend) | `http://127.0.0.1:8000` | Where Next.js proxies `/api/*` (read at build or dev-server start) and where the sign-in page asks for the published credentials (read when the server runs) |
 
@@ -314,6 +315,7 @@ erDiagram
     hosted_zones ||--o{ hosted_zone_vpcs : "associated with"
     hosted_zones ||--o{ hosted_zone_tags : "tagged with"
     hosted_zones ||--o{ record_sets : contains
+    hosted_zones ||--o{ changes : "changed by"
     record_sets ||--o{ record_values : has
 
     users {
@@ -385,6 +387,12 @@ erDiagram
         int position PK
         string value
     }
+    changes {
+        string id PK "C + 13 characters"
+        string zone_id FK
+        string comment
+        datetime submitted_at "status is derived from this"
+    }
 ```
 
 | Table | Purpose | Constraints and indexes |
@@ -395,6 +403,7 @@ erDiagram
 | `hosted_zone_vpcs` | VPCs of private zones. | Unique `(zone_id, vpc_id)`. Cascade on zone delete. |
 | `hosted_zone_tags` | Zone tags. | Unique `(zone_id, key)`. Cascade on zone delete. |
 | `record_sets` | One row per name, type and set identifier. | Unique `(zone_id, name, type, set_identifier)`. Checks on `type`, `routing_policy`, `failover`, TTL range 0 to 2147483647, weight 0 to 255, and alias shape (alias rows have a target and no TTL; others the reverse). Indexes `(zone_id, sort_key, type)` for listing and `(zone_id, type)` for the type filter. Cascade on zone delete. |
+| `changes` | One row per accepted record change, for its simulated status. | Index `(zone_id, submitted_at)`. Cascade on zone delete. The status is not stored; it follows from `submitted_at`. |
 | `record_values` | The values of a record set, in order. | Primary key `(record_set_id, position)`. Index on `value` for search. Cascade on record set delete. |
 
 Notes:
@@ -440,6 +449,7 @@ session cookie.
 | `POST` | `/hostedzones/{zone_id}/records:batch` | Apply an atomic change batch |
 | `GET` | `/hostedzones/{zone_id}/export?format=bind\|json` | Download the zone |
 | `POST` | `/hostedzones/{zone_id}/import` | Preview or import a BIND zone file |
+| `GET` | `/changes/{change_id}` | Status of a record change: `PENDING`, then `INSYNC` |
 
 ### List parameters
 
@@ -536,6 +546,27 @@ Content-Type: application/json
 }
 ```
 
+### Change status
+
+Route 53 answers a record change with a change ID whose status is `PENDING` until the
+change has reached all of its name servers, then `INSYNC`. The clone reproduces the two
+states and nothing more:
+
+- Every accepted record change (single create, edit or delete, a change batch, a zone file
+  import) is saved immediately and gets a change ID such as `C2682N5HXP0BZ4`. A batch
+  returns it as `id` with `status` and `submitted_at`; an import returns `change_id`; the
+  single-record routes return it in the `X-Change-Id` header.
+- `GET /changes/{change_id}` reports `PENDING` for `R53_CHANGE_PROPAGATION_SECONDS` (10 by
+  default) after the change was saved, and `INSYNC` from then on.
+- In the console, the "View status" button of the notification that follows a record
+  change shows that status and follows it until it is `INSYNC`.
+
+**The status is simulated.** No DNS is served, so there is nothing to propagate: the
+records are final and visible the moment the request returns, and the delay is only a
+timer. The table is usable throughout. A rejected change gets no ID, a change can only be
+read by the owner of its zone, and changes older than a day are forgotten the next time
+their zone changes.
+
 ### Errors
 
 Every error has the same body:
@@ -556,7 +587,7 @@ request `field`, the `index` of the failing change in a batch, or the zone file 
 | 400 | A Route 53 rule is violated | `InvalidInput`, `InvalidDomainName`, `InvalidChangeBatch`, `InvalidZoneFile` |
 | 401 | No session, or it expired | `Unauthorized`, `SessionExpired`, `AuthFailure` |
 | 403 | A state-changing request came from a page of another origin | `CrossOriginRequest` |
-| 404 | Unknown zone or record | `NoSuchHostedZone`, `NoSuchRecordSet` |
+| 404 | Unknown zone, record or change | `NoSuchHostedZone`, `NoSuchRecordSet`, `NoSuchChange` |
 | 409 | The change conflicts with existing data, or two requests raced each other | `RecordSetAlreadyExists`, `RecordSetConflict`, `HostedZoneNotEmpty`, `PriorRequestNotComplete` |
 | 422 | The request is malformed | `ValidationError` |
 | 429 | Too many failed sign-ins; `Retry-After` says how long to wait | `Throttling` |
@@ -756,7 +787,8 @@ Registry repository, the backup bucket and the service account.
 - With classic (non-overlay) scrollbars, the development server logs one React hydration
   warning from Cloudscape's table scrollbar, which measures the scrollbar only in the
   browser. Production builds are unaffected.
-- Changes take effect immediately; there is no `PENDING` propagation state.
+- Changes take effect immediately. The `PENDING` and `INSYNC` states are a timer, not
+  propagation; see [Change status](#change-status).
 - SQLite allows one writer at a time, which suits a single-VM demo, not a multi-instance
   deployment.
 - Deliberate visual differences from the real console (the fallback typeface, footer

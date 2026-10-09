@@ -14,22 +14,9 @@ from sqlalchemy.orm import Session
 from app.config import Settings
 from app.db import create_db_engine, create_session_factory
 from app.main import create_app
-from app.models import Base, User
-from app.seed import seed, seed_demo_zones
+from app.models import Base
+from app.seed import ensure_demo_user, seed, seed_demo_zones
 from tests.conftest import API, PASSWORD, alembic_config, make_settings
-
-
-def _first_release_user(db: Session, settings: Settings) -> User:
-    """Insert the demo user with the columns the first schema had."""
-    db.execute(
-        text(
-            "INSERT INTO users (email, password_hash, display_name, account_id, created_at) "
-            "VALUES (:email, 'x', 'demo-admin', '111122223333', '2026-10-09 00:00:00')"
-        ),
-        {"email": settings.demo_email},
-    )
-    db.commit()
-    return User(id=1, email=settings.demo_email)
 
 
 def test_migrations_match_the_models(settings: Settings) -> None:
@@ -63,34 +50,36 @@ def _dump(database: Path, tables: list[str]) -> dict[str, list[tuple[object, ...
 
 
 def test_migrating_a_database_in_use_keeps_every_row(tmp_path: Path) -> None:
-    """Later migrations rebuild tables; that must not cascade into the rows that refer to them."""
+    """Migrations rebuild tables; that must not cascade into the rows that refer to them."""
     database = tmp_path / "in-use.db"
     config = alembic_config(database)
-    command.upgrade(config, "0001")
+    command.upgrade(config, "head")
 
+    # A database as the first release left it: the sample zones belong to the demo user.
     settings = make_settings(database, seed_demo_data=True)
     engine = create_db_engine(settings.database_url)
     with create_session_factory(engine)() as db:
-        # What the first release's seed did: the sample zones belong to the demo user.
-        seed_demo_zones(db, _first_release_user(db, settings))
+        seed_demo_zones(db, ensure_demo_user(db, settings))
     engine.dispose()
 
-    children = [
+    tables = [
         "hosted_zones",
         "hosted_zone_vpcs",
         "hosted_zone_tags",
         "record_sets",
         "record_values",
     ]
-    before = _dump(database, children)
+    before = _dump(database, tables)
     assert len(before["hosted_zones"]) == 12
     assert len(before["record_values"]) > 50
 
-    command.upgrade(config, "head")
-    assert _dump(database, children) == before
-
     command.downgrade(config, "0001")
-    assert _dump(database, children) == before
+    assert _dump(database, tables) == before
+    assert len(_dump(database, ["users"])["users"]) == 1
+
+    command.upgrade(config, "head")
+    assert _dump(database, tables) == before
+    assert len(_dump(database, ["users"])["users"]) == 1
 
 
 def test_downgrading_removes_sandboxes_and_everything_they_own(tmp_path: Path) -> None:

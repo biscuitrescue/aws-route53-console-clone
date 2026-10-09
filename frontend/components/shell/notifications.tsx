@@ -3,17 +3,21 @@
 import Box from "@cloudscape-design/components/box";
 import Button from "@cloudscape-design/components/button";
 import type { FlashbarProps } from "@cloudscape-design/components/flashbar";
-import { createContext, useCallback, useContext, useMemo, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
 
+import { useChangeStatus } from "@/hooks/use-records";
 import { ApiError } from "@/lib/api/errors";
 import { errorDetail } from "@/lib/format";
 
 interface Notifier {
   /** Green flash: a zone was created or deleted, records were deleted. */
   success: (header: string, content?: ReactNode) => void;
-  /** Blue flash the console shows after record changes, with the propagation note. */
-  recordsChanged: (header: string) => void;
+  /**
+   * Blue flash the console shows after record changes, with the propagation note. Its
+   * "View status" button reports the status of the change with the given ID.
+   */
+  recordsChanged: (header: string, changeId?: string | null) => void;
   /** Plain blue flash, for actions that are outside the clone's scope. */
   info: (header: string, content?: ReactNode) => void;
   /** Red "Error occurred" flash with the service's detail in parentheses. */
@@ -35,6 +39,46 @@ const NotificationsContext = createContext<NotificationsValue | null>(null);
 const PROPAGATION_NOTE =
   'Route 53 propagates your changes to all of the Route 53 authoritative DNS servers within 60 seconds. Use "View status" button to check propagation status.';
 
+/** The flash that reports a change's status; there is one per change. */
+const statusFlashId = (changeId: string) => `change-status-${changeId}`;
+
+const timeOfDay = new Intl.DateTimeFormat(undefined, { timeStyle: "medium" });
+
+type FlashUpdate = Omit<FlashbarProps.MessageDefinition, "id" | "dismissible" | "onDismiss">;
+
+/**
+ * Follows one change from PENDING to INSYNC and keeps its flash up to date. Renders
+ * nothing; it exists so that each watched change gets its own polling query.
+ */
+function ChangeStatusWatcher({
+  changeId,
+  onUpdate,
+}: {
+  changeId: string;
+  onUpdate: (changeId: string, update: FlashUpdate) => void;
+}) {
+  const { data, isError } = useChangeStatus(changeId);
+  useEffect(() => {
+    if (data) {
+      const pending = data.status === "PENDING";
+      onUpdate(changeId, {
+        type: pending ? "info" : "success",
+        loading: pending,
+        header: `Status: ${data.status}`,
+        content: `Change ${data.id}, submitted at ${timeOfDay.format(new Date(data.submitted_at))}.`,
+      });
+    } else if (isError) {
+      onUpdate(changeId, {
+        type: "error",
+        loading: false,
+        header: "Status unavailable",
+        content: `The status of change ${changeId} could not be retrieved.`,
+      });
+    }
+  }, [changeId, data, isError, onUpdate]);
+  return null;
+}
+
 function describeError(error: unknown): string {
   if (error instanceof ApiError) return errorDetail(error.message);
   return error instanceof Error ? error.message : "The request could not be completed.";
@@ -42,9 +86,39 @@ function describeError(error: unknown): string {
 
 export function NotificationsProvider({ children }: { children: ReactNode }) {
   const [items, setItems] = useState<FlashbarProps.MessageDefinition[]>([]);
+  // Changes whose status flash is showing; each is polled until it is INSYNC.
+  const [watched, setWatched] = useState<string[]>([]);
 
   const dismiss = useCallback((id: string) => {
     setItems((current) => current.filter((item) => item.id !== id));
+    setWatched((current) => current.filter((changeId) => statusFlashId(changeId) !== id));
+  }, []);
+
+  /** Show the status flash of a change, or bring it back to the top if it is showing. */
+  const viewStatus = useCallback(
+    (changeId: string) => {
+      const id = statusFlashId(changeId);
+      setItems((current) => [
+        current.find((item) => item.id === id) ?? {
+          id,
+          type: "info",
+          loading: true,
+          header: "Checking status",
+          content: `Change ${changeId}`,
+          dismissible: true,
+          dismissLabel: "Dismiss notification",
+          onDismiss: () => dismiss(id),
+        },
+        ...current.filter((item) => item.id !== id),
+      ]);
+      setWatched((current) => (current.includes(changeId) ? current : [...current, changeId]));
+    },
+    [dismiss],
+  );
+
+  const updateStatus = useCallback((changeId: string, update: FlashUpdate) => {
+    const id = statusFlashId(changeId);
+    setItems((current) => current.map((item) => (item.id === id ? { ...item, ...update } : item)));
   }, []);
 
   const push = useCallback(
@@ -73,25 +147,15 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
     () => ({
       success: (header, content) =>
         push({ type: "success", header, content }, { resolvesErrors: true }),
-      recordsChanged: (header) =>
+      recordsChanged: (header, changeId) =>
         push(
           {
             type: "info",
             header,
             content: PROPAGATION_NOTE,
-            action: (
-              <Button
-                onClick={() =>
-                  push({
-                    type: "success",
-                    header: "Status: INSYNC",
-                    content: "Your changes have propagated to all Route 53 DNS servers.",
-                  })
-                }
-              >
-                View status
-              </Button>
-            ),
+            action: changeId ? (
+              <Button onClick={() => viewStatus(changeId)}>View status</Button>
+            ) : undefined,
           },
           { resolvesErrors: true },
         ),
@@ -120,11 +184,18 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
           ),
         }),
     }),
-    [push, dismiss],
+    [push, dismiss, viewStatus],
   );
 
   const value = useMemo(() => ({ items, notify }), [items, notify]);
-  return <NotificationsContext.Provider value={value}>{children}</NotificationsContext.Provider>;
+  return (
+    <NotificationsContext.Provider value={value}>
+      {watched.map((changeId) => (
+        <ChangeStatusWatcher key={changeId} changeId={changeId} onUpdate={updateStatus} />
+      ))}
+      {children}
+    </NotificationsContext.Provider>
+  );
 }
 
 function useNotificationsContext(): NotificationsValue {

@@ -71,6 +71,14 @@ test("sign in, manage a zone and its records, sign out", async ({ page }) => {
   await expect(flash(page)).toContainText(`Records for ${ZONE} were successfully created.`);
   await expect(page.getByRole("tab", { name: "Records (11)" })).toBeVisible();
 
+  // "View status" follows the change: PENDING at first, INSYNC a few seconds later. The
+  // records are already listed while it is pending.
+  await flash(page).getByRole("button", { name: "View status" }).click();
+  await expect(flash(page)).toContainText("Status: PENDING");
+  await expect(flash(page)).toContainText(/Change C[A-Z0-9]{13}, submitted at/);
+  await expect(flash(page)).toContainText("Status: INSYNC", { timeout: 30_000 });
+  await expect(flash(page)).not.toContainText("Status: PENDING");
+
   // Search and filter.
   const filter = page.getByPlaceholder("Filter records by property or value");
   await filter.fill("www");

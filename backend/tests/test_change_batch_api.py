@@ -42,7 +42,7 @@ def test_a_batch_creates_updates_and_deletes_together(
     )
     assert response.status_code == 200, response.text
     body = response.json()
-    assert (body["status"], body["comment"]) == ("INSYNC", "deploy 42")
+    assert (body["status"], body["comment"]) == ("PENDING", "deploy 42")
     assert (body["created"], body["updated"], body["deleted"]) == (2, 1, 1)
     assert [record["name"] for record in body["record_sets"]] == [
         "new.example.com.",

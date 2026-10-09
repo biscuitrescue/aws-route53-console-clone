@@ -19,6 +19,7 @@ from app.schemas.transfer import (
     ZoneFileImportRequest,
     ZoneFileImportResult,
 )
+from app.services import changes as change_service
 from app.services.change_batch import apply_change_batch
 from app.services.record_rules import describe, quota_message
 
@@ -192,6 +193,7 @@ def import_zone_file(
     has_errors = bool(syntax_errors) or summary.error > 0
     importable = summary.create + summary.replace
 
+    change_id: str | None = None
     if request.dry_run or has_errors or not importable:
         db.rollback()
     if not request.dry_run:
@@ -209,9 +211,11 @@ def import_zone_file(
             )
         if not importable:
             raise InvalidZoneFileError("The zone file does not contain any records to import.")
+        change_id = change_service.record(db, zone, "Zone file import").id
         db.commit()
 
     return ZoneFileImportResult(
+        change_id=change_id,
         dry_run=request.dry_run,
         applied=not request.dry_run,
         summary=summary,

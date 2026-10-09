@@ -191,6 +191,8 @@ export interface paths {
         /**
          * Apply a change batch atomically
          * @description CREATE, UPSERT and DELETE changes run in order in one transaction, like `ChangeResourceRecordSets`. If any change is invalid, none is applied and every failure is listed in `details` with the index of its change.
+         *
+         *     The answer carries the change's `id` and its `status`, which starts as `PENDING`; `GET /changes/{change_id}` reports it afterwards.
          */
         post: operations["change_records"];
         delete?: never;
@@ -264,6 +266,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/changes/{change_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get the status of a change
+         * @description Modelled on Route 53's `GetChange`. A change to a zone's records is `PENDING` for `R53_CHANGE_PROPAGATION_SECONDS` after it was saved and `INSYNC` from then on. The status is simulated: the records are final as soon as the change request returns, and nothing is propagated because no DNS is served. Changes older than a day are forgotten once their zone changes again.
+         */
+        get: operations["get_change"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -303,11 +325,12 @@ export interface components {
         /** ChangeBatchResult */
         ChangeBatchResult: {
             /**
-             * Status
-             * @description Changes apply immediately in the clone
-             * @default INSYNC
+             * Id
+             * @example C2682N5HXP0BZ4
              */
-            status?: string;
+            id: string;
+            /** @description `PENDING` for a few seconds after the change is saved, then `INSYNC`. The status is simulated: the change is in the database at once and no DNS is served. */
+            status: components["schemas"]["ChangeStatus"];
             /** Comment */
             comment: string;
             /**
@@ -327,6 +350,31 @@ export interface components {
              */
             record_sets: components["schemas"]["RecordSetOut"][];
         };
+        /**
+         * ChangeInfo
+         * @description The status of a change, in the shape of Route 53's ``ChangeInfo``.
+         */
+        ChangeInfo: {
+            /**
+             * Id
+             * @example C2682N5HXP0BZ4
+             */
+            id: string;
+            /** @description `PENDING` for a few seconds after the change is saved, then `INSYNC`. The status is simulated: the change is in the database at once and no DNS is served. */
+            status: components["schemas"]["ChangeStatus"];
+            /** Comment */
+            comment: string;
+            /**
+             * Submitted At
+             * Format: date-time
+             */
+            submitted_at: string;
+        };
+        /**
+         * ChangeStatus
+         * @enum {string}
+         */
+        ChangeStatus: "PENDING" | "INSYNC";
         /** ErrorDetail */
         ErrorDetail: {
             /**
@@ -803,6 +851,11 @@ export interface components {
              * @description Syntax errors, by zone file line
              */
             errors: components["schemas"]["ErrorDetail"][];
+            /**
+             * Change Id
+             * @description ID of the change that imported the records; none for a preview
+             */
+            change_id?: string | null;
         };
         /**
          * ZoneType
@@ -1467,6 +1520,8 @@ export interface operations {
             /** @description Successful Response */
             201: {
                 headers: {
+                    /** @description ID of the change this request made; see `GET /changes/{change_id}` */
+                    "X-Change-Id"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -1652,6 +1707,8 @@ export interface operations {
             /** @description Successful Response */
             204: {
                 headers: {
+                    /** @description ID of the change this request made; see `GET /changes/{change_id}` */
+                    "X-Change-Id"?: string;
                     [name: string]: unknown;
                 };
                 content?: never;
@@ -1715,6 +1772,8 @@ export interface operations {
             /** @description Successful Response */
             200: {
                 headers: {
+                    /** @description ID of the change this request made; see `GET /changes/{change_id}` */
+                    "X-Change-Id"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -1880,6 +1939,56 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    get_change: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Change ID */
+                change_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChangeInfo"];
+                };
+            };
+            /** @description Not signed in or the session expired */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The hosted zone or record does not exist */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

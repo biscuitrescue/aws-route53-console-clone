@@ -3,6 +3,7 @@ import type { RecordListParams, ZoneListParams } from "./params";
 /** Cache keys, nested so a whole zone or list can be invalidated with one prefix. */
 export const queryKeys = {
   session: ["session"] as const,
+  change: (changeId: string) => ["changes", changeId] as const,
   zones: ["zones"] as const,
   zoneLists: ["zones", "list"] as const,
   zoneList: (params: ZoneListParams) => ["zones", "list", params] as const,

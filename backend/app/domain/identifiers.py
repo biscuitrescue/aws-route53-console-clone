@@ -8,6 +8,7 @@ from app.domain.enums import ZoneType
 
 _ZONE_ID_ALPHABET = string.ascii_uppercase + string.digits
 _ZONE_ID_RANDOM_LENGTH = 20
+_CHANGE_ID_RANDOM_LENGTH = 13
 _SOA_SUFFIX = "awsdns-hostmaster.amazon.com. 1 7200 900 1209600 86400"
 
 # Each TLD owns a block of 512 name-server numbers, as in real delegation sets.
@@ -24,6 +25,10 @@ APEX_NS_TTL = 172_800
 
 def new_hosted_zone_id() -> str:
     return "Z" + "".join(secrets.choice(_ZONE_ID_ALPHABET) for _ in range(_ZONE_ID_RANDOM_LENGTH))
+
+
+def new_change_id() -> str:
+    return "C" + "".join(secrets.choice(_ZONE_ID_ALPHABET) for _ in range(_CHANGE_ID_RANDOM_LENGTH))
 
 
 def new_record_id() -> str:

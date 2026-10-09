@@ -3,7 +3,7 @@ from typing import Self
 
 from pydantic import BaseModel, Field
 
-from app.domain.enums import ChangeAction, FailoverRole, RecordType, RoutingPolicy
+from app.domain.enums import ChangeAction, ChangeStatus, FailoverRole, RecordType, RoutingPolicy
 from app.models import RecordSet
 
 
@@ -123,10 +123,19 @@ class ChangeBatchRequest(BaseModel):
     changes: list[Change] = Field(min_length=1, max_length=1000)
 
 
-class ChangeBatchResult(BaseModel):
-    status: str = Field(default="INSYNC", description="Changes apply immediately in the clone")
+class ChangeInfo(BaseModel):
+    """The status of a change, in the shape of Route 53's ``ChangeInfo``."""
+
+    id: str = Field(examples=["C2682N5HXP0BZ4"])
+    status: ChangeStatus = Field(
+        description="`PENDING` for a few seconds after the change is saved, then `INSYNC`. "
+        "The status is simulated: the change is in the database at once and no DNS is served."
+    )
     comment: str
     submitted_at: datetime
+
+
+class ChangeBatchResult(ChangeInfo):
     created: int
     updated: int
     deleted: int

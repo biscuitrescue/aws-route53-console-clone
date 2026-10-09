@@ -118,8 +118,8 @@ export function EditRecordForm({ zone, record, onClose, onSaved }: EditRecordFor
     updateRecord.mutate(
       { recordId: record.id, changes: draftToInput(draft) },
       {
-        onSuccess: (saved) => {
-          notify.recordsChanged(`${displayName(saved.name)} was successfully updated.`);
+        onSuccess: ({ record: saved, changeId }) => {
+          notify.recordsChanged(`${displayName(saved.name)} was successfully updated.`, changeId);
           onSaved();
         },
         onError: notify.error,
@@ -203,6 +203,7 @@ export function BulkTtlForm({ zoneId, records, onSaved }: BulkEditProps) {
         onSuccess: (result) => {
           notify.recordsChanged(
             `${result.updated} ${result.updated === 1 ? "record was" : "records were"} successfully updated.`,
+            result.id,
           );
           onSaved();
         },

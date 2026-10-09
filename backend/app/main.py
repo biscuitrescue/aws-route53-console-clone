@@ -11,7 +11,7 @@ from app.config import Settings, get_settings
 from app.db import create_db_engine, create_session_factory
 from app.error_handlers import register_error_handlers
 from app.middleware import SameOriginMiddleware
-from app.routers import auth, health, hosted_zones, records, transfer
+from app.routers import auth, changes, health, hosted_zones, records, transfer
 from app.services.throttle import LoginThrottle, SlidingWindowCounter
 
 API_PREFIX = "/api/v1"
@@ -65,7 +65,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.add_middleware(SameOriginMiddleware, trusted_origins=settings.trusted_origins)
 
     api = APIRouter(prefix=API_PREFIX)
-    for module in (health, auth, hosted_zones, records, transfer):
+    for module in (health, auth, hosted_zones, records, transfer, changes):
         api.include_router(module.router)
     app.include_router(api)
 

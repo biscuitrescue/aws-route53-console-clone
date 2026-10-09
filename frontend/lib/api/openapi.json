@@ -1031,6 +1031,14 @@
                   "$ref": "#/components/schemas/RecordSetOut"
                 }
               }
+            },
+            "headers": {
+              "X-Change-Id": {
+                "description": "ID of the change this request made; see `GET /changes/{change_id}`",
+                "schema": {
+                  "type": "string"
+                }
+              }
             }
           },
           "401": {
@@ -1092,7 +1100,7 @@
           "Records"
         ],
         "summary": "Apply a change batch atomically",
-        "description": "CREATE, UPSERT and DELETE changes run in order in one transaction, like `ChangeResourceRecordSets`. If any change is invalid, none is applied and every failure is listed in `details` with the index of its change.",
+        "description": "CREATE, UPSERT and DELETE changes run in order in one transaction, like `ChangeResourceRecordSets`. If any change is invalid, none is applied and every failure is listed in `details` with the index of its change.\n\nThe answer carries the change's `id` and its `status`, which starts as `PENDING`; `GET /changes/{change_id}` reports it afterwards.",
         "operationId": "change_records",
         "parameters": [
           {
@@ -1304,6 +1312,14 @@
                   "$ref": "#/components/schemas/RecordSetOut"
                 }
               }
+            },
+            "headers": {
+              "X-Change-Id": {
+                "description": "ID of the change this request made; see `GET /changes/{change_id}`",
+                "schema": {
+                  "type": "string"
+                }
+              }
             }
           },
           "401": {
@@ -1394,7 +1410,15 @@
         ],
         "responses": {
           "204": {
-            "description": "Successful Response"
+            "description": "Successful Response",
+            "headers": {
+              "X-Change-Id": {
+                "description": "ID of the change this request made; see `GET /changes/{change_id}`",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
           },
           "401": {
             "description": "Not signed in or the session expired",
@@ -1605,6 +1629,74 @@
           }
         }
       }
+    },
+    "/api/v1/changes/{change_id}": {
+      "get": {
+        "tags": [
+          "Changes"
+        ],
+        "summary": "Get the status of a change",
+        "description": "Modelled on Route 53's `GetChange`. A change to a zone's records is `PENDING` for `R53_CHANGE_PROPAGATION_SECONDS` after it was saved and `INSYNC` from then on. The status is simulated: the records are final as soon as the change request returns, and nothing is propagated because no DNS is served. Changes older than a day are forgotten once their zone changes again.",
+        "operationId": "get_change",
+        "parameters": [
+          {
+            "name": "change_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Change ID",
+              "examples": [
+                "C2682N5HXP0BZ4"
+              ],
+              "title": "Change Id"
+            },
+            "description": "Change ID"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChangeInfo"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in or the session expired",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The hosted zone or record does not exist",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -1687,11 +1779,16 @@
       },
       "ChangeBatchResult": {
         "properties": {
-          "status": {
+          "id": {
             "type": "string",
-            "title": "Status",
-            "description": "Changes apply immediately in the clone",
-            "default": "INSYNC"
+            "title": "Id",
+            "examples": [
+              "C2682N5HXP0BZ4"
+            ]
+          },
+          "status": {
+            "$ref": "#/components/schemas/ChangeStatus",
+            "description": "`PENDING` for a few seconds after the change is saved, then `INSYNC`. The status is simulated: the change is in the database at once and no DNS is served."
           },
           "comment": {
             "type": "string",
@@ -1725,6 +1822,8 @@
         },
         "type": "object",
         "required": [
+          "id",
+          "status",
           "comment",
           "submitted_at",
           "created",
@@ -1733,6 +1832,47 @@
           "record_sets"
         ],
         "title": "ChangeBatchResult"
+      },
+      "ChangeInfo": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id",
+            "examples": [
+              "C2682N5HXP0BZ4"
+            ]
+          },
+          "status": {
+            "$ref": "#/components/schemas/ChangeStatus",
+            "description": "`PENDING` for a few seconds after the change is saved, then `INSYNC`. The status is simulated: the change is in the database at once and no DNS is served."
+          },
+          "comment": {
+            "type": "string",
+            "title": "Comment"
+          },
+          "submitted_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Submitted At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "status",
+          "comment",
+          "submitted_at"
+        ],
+        "title": "ChangeInfo",
+        "description": "The status of a change, in the shape of Route 53's ``ChangeInfo``."
+      },
+      "ChangeStatus": {
+        "type": "string",
+        "enum": [
+          "PENDING",
+          "INSYNC"
+        ],
+        "title": "ChangeStatus"
       },
       "ErrorDetail": {
         "properties": {
@@ -2992,6 +3132,18 @@
             "type": "array",
             "title": "Errors",
             "description": "Syntax errors, by zone file line"
+          },
+          "change_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Change Id",
+            "description": "ID of the change that imported the records; none for a preview"
           }
         },
         "type": "object",

@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 
 from app.domain.enums import ChangeAction
 from app.errors import AppError, InvalidChangeBatchError
+from app.models import Change as SavedChange
 from app.models import HostedZone, RecordSet
 from app.repositories import records as record_repository
 from app.schemas.record_set import Change, RecordSetInput
@@ -19,6 +20,8 @@ class BatchOutcome:
     updated: int = 0
     deleted: int = 0
     record_sets: list[RecordSet] = field(default_factory=list)
+    # Set once the batch is saved; a dry run has none.
+    change: SavedChange | None = None
 
 
 def _delete(db: Session, zone: HostedZone, payload: RecordSetInput, outcome: BatchOutcome) -> None:
