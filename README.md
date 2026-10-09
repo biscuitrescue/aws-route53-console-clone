@@ -11,9 +11,11 @@ recreates the console's workflows and rules; it does not serve DNS.
 | Database | SQLite (WAL, foreign keys enforced) |
 | Hosting | One Compute Engine VM on Google Cloud: Caddy, Next.js, FastAPI in Docker Compose |
 
-The UI was built from captures of the real console (see [docs/ui-spec.md](docs/ui-spec.md))
-with the console's own design system, so layout, wording, motion and keyboard behaviour
-match it closely.
+The UI was built from captures of the real console with the console's own design system,
+so layout, wording, motion and keyboard behaviour match it closely. What the console looks
+like and how the clone was compared with it is written down in
+[docs/ui-spec.md](docs/ui-spec.md) and
+[docs/parity/reference-audit.md](docs/parity/reference-audit.md).
 
 | Hosted zones | Records and the record panel |
 |---|---|
@@ -23,9 +25,13 @@ match it closely.
 |---|---|
 | ![Quick create record](docs/screenshots/create-record.png) | ![Dark mode](docs/screenshots/dark-mode.png) |
 
-| Import zone file | Sign-in |
+| Import zone file | Record wizard |
 |---|---|
-| ![Zone file import with preview](docs/screenshots/import-zone-file.png) | ![Sign-in page](docs/screenshots/sign-in.png) |
+| ![Zone file import with preview](docs/screenshots/import-zone-file.png) | ![Record wizard, step 1](docs/screenshots/record-wizard.png) |
+
+| Sign-in | |
+|---|---|
+| ![Sign-in page](docs/screenshots/sign-in.png) | |
 
 **Live demo:** <https://35-208-96-233.sslip.io> (sign in with `demo@example.com` /
 `Route53Demo!`, or use the "Sign in as demo" button). API reference:
@@ -47,24 +53,25 @@ match it closely.
 | Assignment scope | What is implemented |
 |---|---|
 | Authentication | Mocked sign-in against a seeded demo account. Opaque session token in an httpOnly cookie, stored hashed, 14-day expiry, survives reloads, browser restarts and server restarts. A route guard sends visitors without a session to sign-in and back to where they were going. |
-| Hosted zones | List with property filter, sorting, pagination and preferences; details side panel; create (public or private with VPC associations, tags); edit description and tags; delete with typed confirmation and Route 53's "zone must be empty" rule. |
-| DNS records | A, AAAA, CNAME, TXT, MX, NS, PTR, SRV, CAA (plus the zone's SOA). Table with free-text and property filters, type / routing policy / alias quick filters, sorting, pagination, preferences; quick create for several records at once; edit in the side panel; delete with a confirmation listing the records. Simple, weighted, latency, failover, geolocation and multivalue routing, and alias records. |
-| Route 53 experience | The console's frame: global header with search, toolbar with breadcrumbs, side navigation, stacked flash notifications, help panel behind every "Info" link, side split panel, footer. Tables, forms, modals, empty and no-match states use the console's wording. |
+| Hosted zones | List with property filter, sorting, pagination and preferences; details side panel; create (public or private with VPC associations, tags); edit description, tags and VPC associations in one atomic save; delete with typed confirmation and Route 53's "zone must be empty" rule. |
+| DNS records | A, AAAA, CNAME, TXT, MX, NS, PTR, SRV, CAA (plus the zone's SOA). Table with free-text and property filters, type / routing policy / alias quick filters, sorting, pagination, preferences; quick create for several records at once, or the two-step wizard (routing policy, then records); edit in the side panel; delete with a confirmation listing the records. Simple, weighted, latency, failover, geolocation and multivalue routing, and alias records. |
+| Route 53 experience | The console's frame: global header (services menu, search with live results, CloudShell, notifications, help menu, account menu with Sign out), toolbar with breadcrumbs, side navigation, stacked flash notifications including the in-progress ones, help panel behind every "Info" link, side split panel, footer. Tables, forms, modals, empty and no-match states use the console's wording. Controls that belong to other AWS services say so instead of doing nothing. |
 | Route 53 behaviour | Every zone gets an apex NS (TTL 172800, four `awsdns` name servers) and SOA (TTL 900) that cannot be deleted. CNAMEs cannot sit at the apex or share a name with other records. Values are validated per type. Names accept the characters Route 53 lists; `*` is a wildcard only as the whole leftmost label and never for NS records. Routed records need a record ID, cannot mix policies at one name and type, allow one latency record per Region, one geolocation record per location and one primary and one secondary failover record, and share the last TTL given. Duplicate zone names are allowed and get distinct IDs. Error messages use Route 53's wording. |
 | Placeholders | Dashboard, Health checks, Profiles, Traffic policies, Resolver and the other navigation entries show a "Coming soon" page inside the full console frame. |
 | Bonus: import | BIND zone file import (paste or upload) with a live dry-run preview that reports syntax errors by line and rule violations per record, and an option to replace existing records. |
 | Bonus: export | "Export zone" on the zone page downloads a BIND zone file or JSON in the AWS CLI's `list-resource-record-sets` shape. |
 | Bonus: bulk operations | Multi-select delete and bulk TTL edit, both through atomic change batches (`CREATE` / `UPSERT` / `DELETE`) modelled on `ChangeResourceRecordSets`; quick create also submits its records as one batch. |
-| Bonus: dark mode | Visual mode (browser default, light, dark) in the account menu, remembered across visits and applied before first paint. |
+| Bonus: dark mode | Visual mode (browser default, light, dark) in the account menu, as in the console, remembered across visits and applied before first paint. |
 | Bonus: keyboard shortcuts | See below. |
 
 ## Keyboard shortcuts
 
-Press `?` anywhere in the console for this list.
+Press `?` anywhere in the console for this list, or open it from the help menu in the
+top bar. Shortcuts are ignored while typing in a field and while a dialog is open.
 
 | Key | Action |
 |---|---|
-| `Alt` + `S` | Focus the search field in the top bar (searches hosted zones) |
+| `Alt` + `S` | Focus the search field in the top bar (finds hosted zones as you type) |
 | `/` | Focus the table filter |
 | `c` | Create a hosted zone (zones list) or a record (zone page) |
 | `i` | Import a zone file (zone page) |
@@ -80,6 +87,16 @@ Tables are also fully keyboard-navigable (arrow keys move between cells), as in 
 
 - Python 3.12 or newer and [uv](https://docs.astral.sh/uv/)
 - Node.js 22.15 or newer and npm
+
+### One command
+
+```bash
+./dev.sh
+```
+
+It installs what is missing, migrates and seeds the database, and runs the API on
+<http://127.0.0.1:8000> and the web app on <http://localhost:3000> until you press Ctrl+C.
+The two sections below are the same steps by hand.
 
 ### Backend
 
@@ -133,7 +150,7 @@ Every variable is optional. Copy `backend/.env.example` to `backend/.env` and
 
 ```bash
 cd backend
-uv run pytest                    # 343 tests: domain rules, every route, migrations, seed
+uv run pytest                    # 357 tests: domain rules, every route, migrations, seed
 uv run ruff check . && uv run ruff format --check .
 uv run mypy                      # strict
 
@@ -144,9 +161,20 @@ npx playwright install chromium   # once
 npm run test:e2e                 # needs the backend and frontend running
 ```
 
-The end-to-end test signs in, creates a zone, creates one record of every type, filters,
-edits, checks that a non-empty zone cannot be deleted, bulk-deletes, signs out and back in,
-and deletes the zone. Point it at a deployment with `E2E_BASE_URL=https://... npm run test:e2e`.
+The end-to-end tests (ten, in `frontend/e2e`) drive a real browser through the product:
+
+- `smoke.spec.ts`: sign in through the route guard, create a zone, create one record of
+  every type, filter, edit, check that a non-empty zone cannot be deleted, bulk-delete, sign
+  out and back in, delete the zone; a session surviving a new browser context; the
+  placeholder sections.
+- `features.spec.ts`: zone file import (errors by line, preview, import, the all-or-nothing
+  rule) and both exports; bulk TTL edit and bulk delete; every keyboard shortcut and the
+  global search; dark mode surviving a reload; the header menus; the record wizard; a
+  private zone and editing its VPCs and tags. These tests also fail on any browser console
+  error or 5xx response.
+
+Each test creates the zones it needs and removes them, so they can run against a shared
+deployment: `E2E_BASE_URL=https://... npm run test:e2e`.
 
 Each backend test runs against its own SQLite file created by the real Alembic migration,
 so the migration, the constraints and the queries are all exercised.
@@ -196,8 +224,9 @@ frontend/
   lib/
     api/               generated OpenAPI types, typed client, error mapping
     *.ts               routes, formatting, record form model, filter translation
-  e2e/                 Playwright end-to-end test
+  e2e/                 Playwright end-to-end tests
   proxy.ts             redirects visitors without a session to sign-in
+dev.sh                 one-command local start
 deploy/
   docker-compose.prod.yml, Caddyfile
   gcp/                 setup.sh, deploy.sh, startup.sh, backup.sh
@@ -208,9 +237,12 @@ deploy/
 - **Cloudscape for the UI.** The AWS console is built with Cloudscape, AWS's open-source
   design system. Using the same components gives the same layout, tables, filters, modals,
   notifications, focus rings and motion as the real console, instead of an approximation.
-  DevTools snapshots of the real console showed it differs from stock Cloudscape in one
-  visible way, orange primary buttons, so the theme overrides exactly those tokens. The
-  override is generated into a stylesheet at build time, so it is part of the first paint.
+  DevTools snapshots of the real console showed it differs from stock Cloudscape in two
+  visible ways: orange primary buttons and the Amazon Ember typeface. The theme overrides
+  exactly those tokens, in a stylesheet generated at build time so it is part of the first
+  paint. Amazon Ember is not licensed for reuse, so it is only named first in the font
+  stack; the bundled fallback is Ubuntu Sans, chosen by measuring 107 open fonts against
+  text widths recorded from the console (within 1 to 2%).
 - **Filtering, sorting and pagination happen in the API.** The tables send the property
   filter's tokens to the backend (`filter=field:operator:value`), so they behave the same
   with 10 records or 10,000.
@@ -354,7 +386,7 @@ session cookie.
 | `GET` | `/hostedzones` | List zones |
 | `POST` | `/hostedzones` | Create a zone (and its apex NS and SOA) |
 | `GET` | `/hostedzones/{zone_id}` | Zone details with name servers, VPCs and tags |
-| `PATCH` | `/hostedzones/{zone_id}` | Edit the description |
+| `PATCH` | `/hostedzones/{zone_id}` | Edit the description, tags and VPC associations, all or nothing |
 | `DELETE` | `/hostedzones/{zone_id}` | Delete an empty zone |
 | `GET` `PUT` | `/hostedzones/{zone_id}/tags` | Read or replace the zone's tags |
 | `GET` | `/hostedzones/{zone_id}/records` | List records |
@@ -374,12 +406,13 @@ Both list endpoints accept:
 | `type` | Zones: `public` or `private`. Records: a record type; repeat it for several. |
 | `filter` | `field:operator:value`, repeatable. Operators: `eq`, `ne`, `contains`, `not_contains`, `starts_with`, `not_starts_with`, `gt`, `gte`, `lt`, `lte`. |
 | `filter_mode` | `and` (default) or `or` |
-| `sort`, `order` | Sort field and `asc` or `desc` |
+| `sort`, `order` | Sort field and `asc` or `desc`. The default order is Route 53's: by domain, parent before child. |
 | `page`, `page_size` | 1-based page and size (1 to 500, default 50) |
 
-Zone filter fields: `name`, `type`, `description`, `id`, `created_by`, `record_count`.
-Record filter fields: `name`, `type`, `value`, `ttl`, `routing_policy`, `set_identifier`,
-`alias`, `id`.
+Zone filter fields: `name`, `type`, `description`, `id`, `created_by`, `record_count`,
+`accelerated_recovery`. Record filter fields: `name`, `type`, `value`, `ttl`,
+`routing_policy`, `differentiator`, `set_identifier`, `alias`, `health_check_id`,
+`evaluate_target_health`, `id`. Every record column can also be sorted by.
 
 Responses are paged: `{"items": [...], "total": 33, "page": 1, "page_size": 50, "pages": 1}`.
 
@@ -478,7 +511,7 @@ request `field`, the `index` of the failing change in a batch, or the zone file 
 | 400 | A Route 53 rule is violated | `InvalidInput`, `InvalidDomainName`, `InvalidChangeBatch`, `InvalidZoneFile` |
 | 401 | No session, or it expired | `Unauthorized`, `SessionExpired`, `AuthFailure` |
 | 404 | Unknown zone or record | `NoSuchHostedZone`, `NoSuchRecordSet` |
-| 409 | The change conflicts with existing data | `RecordSetAlreadyExists`, `RecordSetConflict`, `HostedZoneNotEmpty` |
+| 409 | The change conflicts with existing data, or two requests raced each other | `RecordSetAlreadyExists`, `RecordSetConflict`, `HostedZoneNotEmpty`, `PriorRequestNotComplete` |
 | 422 | The request is malformed | `ValidationError` |
 
 ## Deployment on Google Cloud
@@ -585,15 +618,22 @@ Registry repository, the backup bucket and the service account.
 - Authentication is mocked: one seeded demo account, no IAM, MFA, sign-up or password reset.
 - Routing policies: simple, weighted, latency, failover, geolocation and multivalue answer
   are stored and validated. Geoproximity and IP-based routing are not implemented.
-- Record types are the nine in the assignment plus SOA; the console's newer types (DS,
-  TLSA, SSHFP, HTTPS, SVCB, NAPTR, SPF) are not offered.
-- The record wizard, Test record, query logging, DNSSEC signing and accelerated recovery
-  are present in the UI but marked as coming soon.
+- Record types are the nine in the assignment plus SOA; the console's other types (DS,
+  TLSA, SSHFP, HTTPS, SVCB, NAPTR, SPF) are listed but disabled.
+- Alias records can point at another record of the same zone by choosing it; any other
+  alias target is entered as a DNS name and hosted zone ID, since there are no AWS
+  resources to choose from.
+- Test record, query logging, DNSSEC signing and accelerated recovery are present in the
+  UI and answer "coming soon". Amazon Q, CloudShell and the account pages of the header
+  answer "not available in this demo".
+- With classic (non-overlay) scrollbars, the development server logs one React hydration
+  warning from Cloudscape's table scrollbar, which measures the scrollbar only in the
+  browser. Production builds are unaffected.
 - Changes take effect immediately; there is no `PENDING` propagation state.
 - SQLite allows one writer at a time, which suits a single-VM demo, not a multi-instance
   deployment.
-- Deliberate visual differences from the real console (font, logo, footer text, the demo
-  notice on the sign-in page) are listed with their reasons in
+- Deliberate visual differences from the real console (the fallback typeface, footer
+  text, the demo notice on the sign-in page) are listed with their reasons in
   [docs/ui-spec.md](docs/ui-spec.md#13-deliberate-differences-from-the-real-console).
 - The frontend's lint tooling currently reports upstream `npm audit` advisories in
   development-only dependencies; nothing affected ships in the production image.

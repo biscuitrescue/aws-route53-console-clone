@@ -1,8 +1,11 @@
 # Private working material (never committed)
 reference/
-docs/parity/
 task.md
 PROMPT.md
+
+# Generated comparison screenshots; only the audit of the references is kept
+docs/parity/*
+!docs/parity/reference-audit.md
 
 # Secrets and local config
 .env
